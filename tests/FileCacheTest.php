@@ -390,4 +390,95 @@ class FileCacheTest extends TestCase
         $cache->setMultiple(['b' => 2]);
         $this->assertSameExceptObject(['b' => 2], $cache->getMultiple(['b']));
     }
+
+    public function testCacheFileSuffix(): void
+    {
+        /** @var FileCache $cache */
+        $cache = $this->createCacheInstance();
+        $cache->clear();
+        $cache->setCacheFileSuffix('.test');
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+
+        $this->assertEquals('.test', substr($cacheFile, -5));
+    }
+
+    public function testDirectoryLevel(): void
+    {
+        /** @var FileCache $cache */
+        $cache = $this->createCacheInstance();
+        $cache->clear();
+        $cache->setDirectoryLevel(0);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+
+        $this->assertEquals(__DIR__ . '/runtime/cache/a.bin', $cacheFile);
+    }
+
+    public function testFileMode(): void
+    {
+        /** @var FileCache $cache */
+        $cache = $this->createCacheInstance();
+        $cache->clear();
+        $cache->setFileMode(0777);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+
+        $permissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
+
+        $this->assertEquals('0777', $permissions);
+    }
+
+    public function testDirMode(): void
+    {
+        /** @var FileCache $cache */
+        $cache = $this->createCacheInstance();
+        $cache->clear();
+        $cache->setDirMode(0777);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+
+        $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
+
+        $this->assertEquals('0777', $permissions);
+    }
+
+    public function testGcProbability(): void
+    {
+        /** @var FileCache $cache */
+        $cache = $this->createCacheInstance();
+        $cache->clear();
+        $cache->setGcProbability(1000000);
+
+        $key = 'gc_probability_test';
+
+        MockHelper::$time = \time();
+
+        $cache->set($key, 1, 1);
+
+        $this->assertSameExceptObject(1, $cache->get($key));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', [$key]);
+
+        $this->assertFileExists($cacheFile);
+
+        MockHelper::$time++;
+        MockHelper::$time++;
+
+        $cache->set('b', 2);
+
+        $this->assertFileNotExists($cacheFile);
+    }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Yiisoft\FileCache\Exception;
+namespace Yiisoft\FileCache;
 
 class CacheException extends \RuntimeException implements \Psr\SimpleCache\CacheException
 {
