@@ -423,10 +423,9 @@ class FileCacheTest extends TestCase
 
     public function testFileMode(): void
     {
-        /** @var FileCache $cache */
-        $cache = $this->createCacheInstance();
+        $cache = new FileCache('/tmp/test_file_cache');
         $cache->clear();
-        $cache->setFileMode(0777);
+        $cache->setFileMode(0755);
 
         $cache->set('a', 1);
         $this->assertSameExceptObject(1, $cache->get('a'));
@@ -435,15 +434,14 @@ class FileCacheTest extends TestCase
 
         $permissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
 
-        $this->assertEquals('0777', $permissions);
+        $this->assertEquals('0755', $permissions);
     }
 
     public function testDirMode(): void
     {
-        /** @var FileCache $cache */
-        $cache = $this->createCacheInstance();
+        $cache = new FileCache('/tmp/test_file_cache');
         $cache->clear();
-        $cache->setDirMode(0777);
+        $cache->setDirMode(0755);
 
         $cache->set('a', 1);
         $this->assertSameExceptObject(1, $cache->get('a'));
@@ -452,7 +450,7 @@ class FileCacheTest extends TestCase
 
         $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
 
-        $this->assertEquals('0777', $permissions);
+        $this->assertEquals('0755', $permissions);
     }
 
     public function testGcProbability(): void
