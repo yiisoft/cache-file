@@ -1,6 +1,6 @@
 <?php
 
-namespace Yiisoft\FileCache\Tests;
+namespace Yiisoft\Cache\File\Tests;
 
 require_once __DIR__ . '/MockHelper.php';
 
@@ -9,8 +9,8 @@ use phpmock\phpunit\PHPMock;
 use Psr\SimpleCache\CacheInterface;
 use Psr\SimpleCache\InvalidArgumentException;
 use ReflectionException;
-use Yiisoft\FileCache\FileCache;
-use Yiisoft\FileCache\MockHelper;
+use Yiisoft\Cache\File\FileCache;
+use Yiisoft\Cache\File\MockHelper;
 
 class FileCacheTest extends TestCase
 {
@@ -373,8 +373,8 @@ class FileCacheTest extends TestCase
 
         // Override fileowner method so it always returns something not equal to the current user
         $notCurrentEuid = posix_geteuid() + 15;
-        $this->getFunctionMock('Yiisoft\FileCache', 'fileowner')->expects($this->any())->willReturn($notCurrentEuid);
-        $this->getFunctionMock('Yiisoft\FileCache', 'unlink')->expects($this->once());
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fileowner')->expects($this->any())->willReturn($notCurrentEuid);
+        $this->getFunctionMock('Yiisoft\Cache\File', 'unlink')->expects($this->once());
 
         $this->assertTrue($cache->set($cacheKey, uniqid('value_2_', false), 2), 'Cannot rebuild cache on different file ownership');
     }

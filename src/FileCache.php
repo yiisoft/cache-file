@@ -1,6 +1,6 @@
-<?php
+<?php declare(strict_types=1);
 
-namespace Yiisoft\FileCache;
+namespace Yiisoft\Cache\File;
 
 use DateInterval;
 use DateTime;
@@ -187,14 +187,18 @@ final class FileCache implements CacheInterface
     /**
      * @noinspection PhpDocMissingThrowsInspection DateTime won't throw exception because constant string is passed as time
      *
-     * Normalizes cache TTL handling `null` value and {@see DateInterval} objects.
-     * @param int|DateInterval|null $ttl raw TTL.
+     * Normalizes cache TTL handling strings and {@see DateInterval} objects.
+     * @param int|string|DateInterval|null $ttl raw TTL.
      * @return int|null TTL value as UNIX timestamp or null meaning infinity
      */
     private function normalizeTtl($ttl): ?int
     {
         if ($ttl instanceof DateInterval) {
             return (new DateTime('@0'))->add($ttl)->getTimestamp();
+        }
+
+        if (is_string($ttl)) {
+            return (int)$ttl;
         }
 
         return $ttl;
