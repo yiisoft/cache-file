@@ -1,6 +1,6 @@
 <?php
 
-namespace Yiisoft\FileCache;
+namespace Yiisoft\Cache\File;
 
 /**
  * Mock for the time() function
