@@ -419,11 +419,15 @@ class FileCacheTest extends TestCase
 
         $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
 
-        $this->assertEquals(__DIR__ . '/runtime/cache/a.bin', $cacheFile);
+        $this->assertPathEquals(__DIR__ . '/runtime/cache/a.bin', $cacheFile);
     }
 
     public function testFileMode(): void
     {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Can not test permissions on Windows');
+        }
+
         $cache = new FileCache('/tmp/test_file_cache');
         $cache->clear();
         $cache->setFileMode(0755);
@@ -440,6 +444,10 @@ class FileCacheTest extends TestCase
 
     public function testDirMode(): void
     {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Can not test permissions on Windows');
+        }
+
         $cache = new FileCache('/tmp/test_file_cache');
         $cache->clear();
         $cache->setDirMode(0755);
@@ -542,5 +550,22 @@ class FileCacheTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $cache = $this->createCacheInstance();
         $cache->has(1);
+    }
+
+    private function isWindows(): bool
+    {
+        return DIRECTORY_SEPARATOR === '\\';
+    }
+
+    private function assertPathEquals($expected, $actual, string $message = ''): void
+    {
+        $expected = $this->normalizePath($expected);
+        $actual = $this->normalizePath($actual);
+        $this->assertSame($expected, $actual, $message);
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return str_replace('\\', '/', $path);
     }
 }
