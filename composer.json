@@ -24,7 +24,7 @@
         "yiisoft/serializer": "dev-master"
     },
     "require-dev": {
-        "phpunit/phpunit": "^8.4",
+        "phpunit/phpunit": "^9.0",
         "php-mock/php-mock-phpunit": "^2.4"
     },
     "autoload": {
