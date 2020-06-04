@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Yiisoft\Cache\File\Tests;
 
 require_once __DIR__ . '/MockHelper.php';
@@ -486,7 +488,7 @@ class FileCacheTest extends TestCase
 
         $cache->set('b', 2);
 
-        $this->assertFileNotExists($cacheFile);
+        $this->assertFileDoesNotExist($cacheFile);
     }
 
     public function testGetInvalidKey(): void
