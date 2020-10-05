@@ -24,8 +24,9 @@
         "yiisoft/serializer": "dev-master"
     },
     "require-dev": {
+        "php-mock/php-mock-phpunit": "^2.4",
         "phpunit/phpunit": "^9.3",
-        "php-mock/php-mock-phpunit": "^2.4"
+        "yiisoft/aliases": "^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -40,6 +41,10 @@
     "extra": {
         "branch-alias": {
             "dev-master": "3.0.x-dev"
+        },
+        "config-plugin": {
+            "common": "config/common.php",
+            "params": "config/params.php"
         }
     },
     "config": {
