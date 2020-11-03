@@ -25,9 +25,9 @@
     },
     "require-dev": {
         "php-mock/php-mock-phpunit": "^2.4",
-        "infection/infection": "^0.18.0 || ^0.20.0",
-        "phpunit/phpunit": "^9.3",
-        "vimeo/psalm": "^4.0",
+        "infection/infection": "^0.20.0",
+        "phpunit/phpunit": "^9.4",
+        "vimeo/psalm": "^4.1",
         "yiisoft/aliases": "^1.0"
     },
     "autoload": {
