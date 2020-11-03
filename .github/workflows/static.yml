@@ -15,7 +15,7 @@ jobs:
         os:
           - ubuntu-latest
 
-        php-version:
+        php:
           - "7.4"
 
     steps:
