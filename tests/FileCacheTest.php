@@ -32,8 +32,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProvider
+     *
      * @param $key
      * @param $value
+     *
      * @throws InvalidArgumentException
      */
     public function testSet($key, $value): void
@@ -48,8 +50,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProvider
+     *
      * @param $key
      * @param $value
+     *
      * @throws InvalidArgumentException
      */
     public function testGet($key, $value): void
@@ -65,8 +69,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProvider
+     *
      * @param $key
      * @param $value
+     *
      * @throws InvalidArgumentException
      */
     public function testValueInCacheCannotBeChanged($key, $value): void
@@ -90,8 +96,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProvider
+     *
      * @param $key
      * @param $value
+     *
      * @throws InvalidArgumentException
      */
     public function testHas($key, $value): void
@@ -119,8 +127,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProvider
+     *
      * @param $key
      * @param $value
+     *
      * @throws InvalidArgumentException
      */
     public function testDelete($key, $value): void
@@ -137,8 +147,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProvider
+     *
      * @param $key
      * @param $value
+     *
      * @throws InvalidArgumentException
      */
     public function testClear($key, $value): void
@@ -152,7 +164,9 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProviderSetMultiple
+     *
      * @param int|null $ttl
+     *
      * @throws InvalidArgumentException
      */
     public function testSetMultiple(?int $ttl): void
@@ -237,8 +251,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider dataProviderNormalizeTtl
+     *
      * @param mixed $ttl
      * @param mixed $expectedResult
+     *
      * @throws ReflectionException
      */
     public function testNormalizeTtl($ttl, $expectedResult): void
@@ -249,9 +265,10 @@ class FileCacheTest extends TestCase
 
     /**
      * Data provider for {@see testNormalizeTtl()}
-     * @return array test data
      *
      * @throws \Exception
+     *
+     * @return array test data
      */
     public function dataProviderNormalizeTtl(): array
     {
@@ -267,8 +284,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider ttlToExpirationProvider
+     *
      * @param mixed $ttl
      * @param mixed $expected
+     *
      * @throws ReflectionException
      */
     public function testTtlToExpiration($ttl, $expected): void
@@ -296,8 +315,10 @@ class FileCacheTest extends TestCase
 
     /**
      * @dataProvider iterableProvider
+     *
      * @param array $array
      * @param iterable $iterable
+     *
      * @throws InvalidArgumentException
      */
     public function testValuesAsIterable(array $array, iterable $iterable): void
@@ -328,15 +349,15 @@ class FileCacheTest extends TestCase
                     {
                         return new \ArrayIterator(['a' => 1, 'b' => 2,]);
                     }
-                }
+                },
             ],
             'generator' => [
                 ['a' => 1, 'b' => 2,],
                 (static function () {
                     yield 'a' => 1;
                     yield 'b' => 2;
-                })()
-            ]
+                })(),
+            ],
         ];
     }
 
@@ -356,6 +377,7 @@ class FileCacheTest extends TestCase
     /**
      * We have to on separate process because of PHPMock not being able to mock a function that
      * was already called.
+     *
      * @runInSeparateProcess
      */
     public function testCacheRenewalOnDifferentOwnership(): void

@@ -82,8 +82,7 @@ final class FileCache implements CacheInterface
                 $cacheValue = @stream_get_contents($fp);
                 @flock($fp, LOCK_UN);
                 @fclose($fp);
-                $cacheValue = $this->serializer->unserialize($cacheValue);
-                return $cacheValue;
+                return $this->serializer->unserialize($cacheValue);
             }
         }
 
@@ -178,7 +177,9 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts TTL to expiration
-     * @param int|DateInterval|null $ttl
+     *
+     * @param DateInterval|int|null $ttl
+     *
      * @return int
      */
     private function ttlToExpiration($ttl): int
@@ -186,9 +187,9 @@ final class FileCache implements CacheInterface
         $ttl = $this->normalizeTtl($ttl);
 
         if ($ttl === null) {
-            $expiration = static::TTL_INFINITY + time();
+            $expiration = self::TTL_INFINITY + time();
         } elseif ($ttl <= 0) {
-            $expiration = static::EXPIRATION_EXPIRED;
+            $expiration = self::EXPIRATION_EXPIRED;
         } else {
             $expiration = $ttl + time();
         }
@@ -200,7 +201,9 @@ final class FileCache implements CacheInterface
      * @noinspection PhpDocMissingThrowsInspection DateTime won't throw exception because constant string is passed as time
      *
      * Normalizes cache TTL handling strings and {@see DateInterval} objects.
-     * @param int|string|DateInterval|null $ttl raw TTL.
+     *
+     * @param DateInterval|int|string|null $ttl raw TTL.
+     *
      * @return int|null TTL value as UNIX timestamp or null meaning infinity
      */
     private function normalizeTtl($ttl): ?int
@@ -233,7 +236,9 @@ final class FileCache implements CacheInterface
 
     /**
      * Returns the cache file path given the cache key.
+     *
      * @param string $key cache key
+     *
      * @return string the cache file path
      */
     private function getCacheFile(string $key): string
@@ -254,6 +259,7 @@ final class FileCache implements CacheInterface
 
     /**
      * Removes expired cache files
+     *
      * @throws \Exception
      */
     public function gc(): void
@@ -266,6 +272,7 @@ final class FileCache implements CacheInterface
     /**
      * Recursively removing expired cache files under a directory.
      * This method is mainly used by {@see gc()}.
+     *
      * @param string $path the directory under which expired cache files are removed.
      * @param bool $expiredOnly whether to only remove expired cache files. If false, all files
      * under `$path` will be removed.
@@ -347,6 +354,7 @@ final class FileCache implements CacheInterface
 
     /**
      * @param string $key
+     *
      * @return bool
      */
     private function existsAndNotExpired(string $key): bool
@@ -356,7 +364,9 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts iterable to array. If provided value is not iterable it throws an InvalidArgumentException
+     *
      * @param $iterable
+     *
      * @return array
      */
     private function iterableToArray($iterable): array
