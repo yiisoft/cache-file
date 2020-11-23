@@ -26,7 +26,7 @@
     "require-dev": {
         "php-mock/php-mock-phpunit": "^2.6",
         "phpunit/phpunit": "^9.4",
-        "roave/infection-static-analysis-plugin": "^1.4",
+        "roave/infection-static-analysis-plugin": "^1.5",
         "vimeo/psalm": "^4.1",
         "yiisoft/aliases": "^1.1"
     },
