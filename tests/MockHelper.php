@@ -11,14 +11,13 @@ namespace Yiisoft\Cache\File;
  */
 function time(): int
 {
-    return MockHelper::$time ?: \time();
+    return MockHelper::$time ?? \time();
 }
 
-class MockHelper
+final class MockHelper
 {
     /**
-     * @var int virtual time to be returned by mocked time() function.
-     * null means normal time() behavior.
+     * @var int|null The virtual time to be returned by mocked time() function. null means normal time() behavior.
      */
-    public static $time;
+    public static ?int $time = null;
 }
