@@ -108,7 +108,7 @@ final class FileCache implements CacheInterface
     public function __construct(string $cachePath)
     {
         if (!$this->createDirectoryIfNotExists($cachePath)) {
-            throw new CacheException("Failed to create cache directory \"{$cachePath}\"");
+            throw new CacheException("Failed to create cache directory \"{$cachePath}\".");
         }
 
         $this->cachePath = $cachePath;
