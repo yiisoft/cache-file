@@ -17,7 +17,6 @@ use function dirname;
 use function error_get_last;
 use function filemtime;
 use function fileowner;
-use function file_exists;
 use function fopen;
 use function function_exists;
 use function gettype;
@@ -140,9 +139,10 @@ final class FileCache implements CacheInterface
         }
 
         $file = $this->getCacheFile($key);
+        $cacheDirectory = dirname($file);
 
-        if ($this->directoryLevel > 0 && !$this->createDirectoryIfNotExists(dirname($file))) {
-            return false;
+        if (!is_dir($this->cachePath) || ($this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($cacheDirectory))) {
+            throw new CacheException("Failed to create cache directory \"{$cacheDirectory}\".");
         }
 
         // If ownership differs the touch call will fail, so we try to
@@ -168,7 +168,7 @@ final class FileCache implements CacheInterface
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
 
-        if (!file_exists($file)) {
+        if (!is_file($file)) {
             return true;
         }
 
@@ -344,7 +344,7 @@ final class FileCache implements CacheInterface
      */
     private function createDirectoryIfNotExists(string $path): bool
     {
-        return is_dir($path) || (mkdir($path, $this->directoryMode, true) && is_dir($path));
+        return is_dir($path) || (!is_file($path) && mkdir($path, $this->directoryMode, true) && is_dir($path));
     }
 
     /**
@@ -446,7 +446,7 @@ final class FileCache implements CacheInterface
      */
     private function existsAndNotExpired(string $file): bool
     {
-        return file_exists($file) && @filemtime($file) > time();
+        return is_file($file) && @filemtime($file) > time();
     }
 
     /**

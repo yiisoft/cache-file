@@ -6,8 +6,6 @@
     <br>
 </p>
 
-The package implements file-based PSR-16 cache,
-
 [![Latest Stable Version](https://poser.pugx.org/yiisoft/cache-file/v/stable.png)](https://packagist.org/packages/yiisoft/cache-file)
 [![Total Downloads](https://poser.pugx.org/yiisoft/cache-file/downloads.png)](https://packagist.org/packages/yiisoft/cache-file)
 [![Build status](https://github.com/yiisoft/cache-file/workflows/build/badge.svg)](https://github.com/yiisoft/cache-file/actions?query=workflow%3Abuild)
@@ -17,9 +15,108 @@ The package implements file-based PSR-16 cache,
 [![static analysis](https://github.com/yiisoft/cache-file/workflows/static%20analysis/badge.svg)](https://github.com/yiisoft/cache-file/actions?query=workflow%3A%22static+analysis%22)
 [![type-coverage](https://shepherd.dev/github/yiisoft/cache-file/coverage.svg)](https://shepherd.dev/github/yiisoft/cache-file)
 
+This package implements file-based [PSR-16](https://www.php-fig.org/psr/psr-16/) cache.
+
+## Installation
+
+The package could be installed with composer:
+
+```
+composer install yiisoft/cache-file
+```
+
+## Configuration
+
+When creating an instance of `\Yiisoft\Cache\File\FileCache`, you must specify
+the path to the base directory in which the cache files will be stored:
+
+```php
+$cache = new \Yiisoft\Cache\File\FileCache('/path/to/directory');
+```
+
+Change the suffix of the cache files:
+
+```php
+$cache = $cache->withFileSuffix('.txt'); // default is '.bin'
+```
+
+Change the permission to be set for newly created cache files:
+
+```php
+$cache = $cache->withFileMode(0644); // default is null
+```
+
+This value will be used by PHP `chmod()` function. No umask will be applied.
+If not set, the permission will be determined by the current environment.
+
+Change the permission to be set for newly created directories:
+
+```php
+$cache = $cache->withDirectoryMode(0777); // default is 0775
+```
+
+This value will be used by PHP `chmod()` function. No umask will be applied. Defaults to 0775,
+meaning the directory is read-writable by an owner and group, but read-only for other users.
+
+Change the level of sub-directories to store cache files:
+
+```php
+$cache = $cache->withDirectoryLevel(3); // default is 1
+```
+
+If the system has huge number of cache files (e.g. one million), you may use a bigger
+value (usually no bigger than 3). Using sub-directories is mainly to ensure the file
+system is not over burdened with a single directory having too many files.
+
+Change the probability of performing garbage collection when storing a piece of data in the cache:
+
+```php
+$cache = $cache->withGcProbability(1000); // default is 10
+```
+
+The probability (parts per million) that garbage collection (GC) should be performed when
+storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance. This number
+should be between 0 and 1000000. A value 0 means no GC will be performed at all.
+
 ## General usage
 
-## Testing
+The package does not contain any additional functionality for interacting with the cache,
+except those defined in the [PSR-16](https://www.php-fig.org/psr/psr-16/) interface.
+
+```php
+$cache = new \Yiisoft\Cache\File\FileCache('/path/to/directory');
+$parameters = ['user_id' => 42];
+$key = 'demo';
+
+// try retrieving $data from cache
+$data = $cache->get($key);
+
+if ($data === null) {
+    // $data is not found in cache, calculate it from scratch
+    $data = calculateData($parameters);
+    
+    // store $data in cache for an hour so that it can be retrieved next time
+    $cache->set($key, $data, 3600);
+}
+
+// $data is available here
+```
+
+In order to delete value you can use:
+
+```php
+$cache->delete($key);
+// Or all cache
+$cache->clear();
+```
+
+To work with values in a more efficient manner, batch operations should be used:
+
+- `getMultiple()`
+- `setMultiple()`
+- `deleteMultiple()`
+
+This package can be used as a cache handler for the [Yii Caching Library](https://github.com/yiisoft/cache).
 
 ### Unit testing
 

@@ -14,6 +14,7 @@ use phpmock\phpunit\PHPMock;
 use Psr\SimpleCache\InvalidArgumentException;
 use ReflectionException;
 use stdClass;
+use Yiisoft\Cache\File\CacheException;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
 
@@ -21,6 +22,7 @@ use function array_keys;
 use function array_map;
 use function dirname;
 use function fileperms;
+use function file_put_contents;
 use function function_exists;
 use function glob;
 use function is_dir;
@@ -39,12 +41,14 @@ final class FileCacheTest extends TestCase
 {
     use PHPMock;
 
+    private const RUNTIME_DIRECTORY = __DIR__ . '/runtime';
+
     private FileCache $cache;
     private string $tmpDir;
 
     public function setUp(): void
     {
-        $this->cache = new FileCache(__DIR__ . '/runtime/cache');
+        $this->cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache');
         $this->tmpDir = sys_get_temp_dir() . '/yiisoft-test-file-cache';
     }
 
@@ -52,7 +56,7 @@ final class FileCacheTest extends TestCase
     {
         MockHelper::$time = null;
         $this->removeDirectory($this->tmpDir);
-        $this->removeDirectory(__DIR__ . '/runtime');
+        $this->removeDirectory(self::RUNTIME_DIRECTORY);
     }
 
     /**
@@ -483,6 +487,33 @@ final class FileCacheTest extends TestCase
         $this->assertFileDoesNotExist($cacheFile);
     }
 
+    public function testDeleteForCacheItemNotExist(): void
+    {
+        $this->assertNull($this->cache->get('key'));
+        $this->assertTrue($this->cache->delete('key'));
+        $this->assertNull($this->cache->get('key'));
+    }
+
+    public function testSetThrowExceptionForInvalidCacheDirectory(): void
+    {
+        $directory = self::RUNTIME_DIRECTORY . '/cache/fail';
+        $cache = new FileCache($directory);
+
+        $this->removeDirectory($directory);
+        file_put_contents($directory, 'fail');
+
+        $this->expectException(CacheException::class);
+        $cache->set('key', 'value');
+    }
+
+    public function testConstructorThrowExceptionForInvalidCacheDirectory(): void
+    {
+        $file = self::RUNTIME_DIRECTORY . '/fail';
+        file_put_contents($file, 'fail');
+        $this->expectException(CacheException::class);
+        new FileCache($file);
+    }
+
     public function invalidKeyProvider(): array
     {
         return [
@@ -502,7 +533,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testGetInvalidKey($key): void
+    public function testGetThrowExceptionForInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->get($key);
@@ -513,7 +544,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testSetInvalidKey($key): void
+    public function testSetThrowExceptionForInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->set($key, 'value');
@@ -524,7 +555,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testDeleteInvalidKey($key): void
+    public function testDeleteThrowExceptionForInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->delete($key);
@@ -535,7 +566,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testGetMultipleInvalidKeys($key): void
+    public function testGetMultipleThrowExceptionForInvalidKeys($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->getMultiple([$key]);
@@ -546,7 +577,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testGetMultipleInvalidKeysNotIterable($key): void
+    public function testGetMultipleThrowExceptionForInvalidKeysNotIterable($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->getMultiple($key);
@@ -557,7 +588,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testSetMultipleInvalidKeysNotIterable($key): void
+    public function testSetMultipleThrowExceptionForInvalidKeysNotIterable($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->setMultiple($key);
@@ -568,7 +599,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testDeleteMultipleInvalidKeys($key): void
+    public function testDeleteMultipleThrowExceptionForInvalidKeys($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->deleteMultiple([$key]);
@@ -579,7 +610,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testDeleteMultipleInvalidKeysNotIterable($key): void
+    public function testDeleteMultipleThrowExceptionForInvalidKeysNotIterable($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->deleteMultiple($key);
@@ -590,7 +621,7 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testHasInvalidKey($key): void
+    public function testHasThrowExceptionForInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->has($key);
