@@ -494,7 +494,7 @@ final class FileCacheTest extends TestCase
         $this->assertNull($this->cache->get('key'));
     }
 
-    public function testSetReturnFalseForCacheDirectoryNotExists(): void
+    public function testSetThrowExceptionForInvalidCacheDirectory(): void
     {
         $directory = self::RUNTIME_DIRECTORY . '/cache/fail';
         $cache = new FileCache($directory);
@@ -502,7 +502,8 @@ final class FileCacheTest extends TestCase
         $this->removeDirectory($directory);
         file_put_contents($directory, 'fail');
 
-        $this->assertFalse($cache->set('key', 'value'));
+        $this->expectException(CacheException::class);
+        $cache->set('key', 'value');
     }
 
     public function testConstructorThrowExceptionForInvalidCacheDirectory(): void

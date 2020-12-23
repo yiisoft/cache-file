@@ -139,12 +139,10 @@ final class FileCache implements CacheInterface
         }
 
         $file = $this->getCacheFile($key);
+        $fileDir = dirname($file);
 
-        if (
-            !is_dir($this->cachePath)
-            || ($this->directoryLevel > 0 && !$this->createDirectoryIfNotExists(dirname($file)))
-        ) {
-            return false;
+        if (!is_dir($this->cachePath) || ($this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($fileDir))) {
+            throw new CacheException("Failed to create cache directory \"{$fileDir}\".");
         }
 
         // If ownership differs the touch call will fail, so we try to
