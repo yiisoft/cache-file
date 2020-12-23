@@ -6,27 +6,35 @@ namespace Yiisoft\Cache\File\Tests;
 
 use Psr\SimpleCache\CacheInterface;
 use Psr\SimpleCache\InvalidArgumentException;
+use ReflectionClass;
+use ReflectionException;
+use ReflectionObject;
+use stdClass;
+
+use function is_array;
+use function is_object;
 
 abstract class TestCase extends \PHPUnit\Framework\TestCase
 {
     /**
      * Invokes a inaccessible method.
      *
-     * @param $object
-     * @param $method
+     * @param object $object
+     * @param string $method
      * @param array $args
      * @param bool $revoke whether to make method inaccessible after execution
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      *
      * @return mixed
      */
-    protected function invokeMethod($object, $method, array $args = [], bool $revoke = true)
+    protected function invokeMethod(object $object, string $method, array $args = [], bool $revoke = true)
     {
-        $reflection = new \ReflectionObject($object);
+        $reflection = new ReflectionObject($object);
         $method = $reflection->getMethod($method);
         $method->setAccessible(true);
         $result = $method->invokeArgs($object, $args);
+
         if ($revoke) {
             $method->setAccessible(false);
         }
@@ -37,22 +45,23 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Sets an inaccessible object property to a designated value.
      *
-     * @param $object
-     * @param $propertyName
-     * @param $value
+     * @param object $object
+     * @param string $propertyName
+     * @param mixed $value
      * @param bool $revoke whether to make property inaccessible after setting
-     *
-     * @throws \ReflectionException
      */
-    protected function setInaccessibleProperty($object, $propertyName, $value, bool $revoke = true): void
+    protected function setInaccessibleProperty(object $object, string $propertyName, $value, bool $revoke = true): void
     {
-        $class = new \ReflectionClass($object);
+        $class = new ReflectionClass($object);
+
         while (!$class->hasProperty($propertyName)) {
             $class = $class->getParentClass();
         }
+
         $property = $class->getProperty($propertyName);
         $property->setAccessible(true);
         $property->setValue($object, $value);
+
         if ($revoke) {
             $property->setAccessible(false);
         }
@@ -61,23 +70,24 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Gets an inaccessible object property.
      *
-     * @param $object
-     * @param $propertyName
+     * @param object $object
+     * @param string $propertyName
      * @param bool $revoke whether to make property inaccessible after getting
-     *
-     * @throws \ReflectionException
      *
      * @return mixed
      */
-    protected function getInaccessibleProperty($object, $propertyName, bool $revoke = true)
+    protected function getInaccessibleProperty(object $object, string $propertyName, bool $revoke = true)
     {
-        $class = new \ReflectionClass($object);
+        $class = new ReflectionClass($object);
+
         while (!$class->hasProperty($propertyName)) {
             $class = $class->getParentClass();
         }
+
         $property = $class->getProperty($propertyName);
         $property->setAccessible(true);
         $result = $property->getValue($object);
+
         if ($revoke) {
             $property->setAccessible(false);
         }
@@ -87,8 +97,9 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
     public function dataProvider(): array
     {
-        $object = new \stdClass();
+        $object = new stdClass();
         $object->test_field = 'test_value';
+
         return [
             'integer' => ['test_integer', 1],
             'double' => ['test_double', 1.1],
@@ -107,9 +118,9 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
     public function getDataProviderData($keyPrefix = ''): array
     {
-        $dataProvider = $this->dataProvider();
         $data = [];
-        foreach ($dataProvider as $item) {
+
+        foreach ($this->dataProvider() as $item) {
             $data[$keyPrefix . $item[0]] = $item[1];
         }
 

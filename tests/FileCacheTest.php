@@ -6,28 +6,53 @@ namespace Yiisoft\Cache\File\Tests;
 
 require_once __DIR__ . '/MockHelper.php';
 
+use ArrayIterator;
 use DateInterval;
+use Exception;
+use IteratorAggregate;
 use phpmock\phpunit\PHPMock;
-use Psr\SimpleCache\CacheInterface;
 use Psr\SimpleCache\InvalidArgumentException;
 use ReflectionException;
+use stdClass;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
 
-class FileCacheTest extends TestCase
+use function array_keys;
+use function array_map;
+use function dirname;
+use function fileperms;
+use function function_exists;
+use function glob;
+use function is_dir;
+use function is_object;
+use function posix_geteuid;
+use function rmdir;
+use function sprintf;
+use function str_replace;
+use function substr;
+use function sys_get_temp_dir;
+use function time;
+use function uniqid;
+use function unlink;
+
+final class FileCacheTest extends TestCase
 {
     use PHPMock;
 
-    protected const CACHE_DIRECTORY = __DIR__ . '/runtime/cache';
+    private FileCache $cache;
+    private string $tmpDir;
 
-    protected function tearDown(): void
+    public function setUp(): void
     {
-        MockHelper::$time = null;
+        $this->cache = new FileCache(__DIR__ . '/runtime/cache');
+        $this->tmpDir = sys_get_temp_dir() . '/yiisoft-test-file-cache';
     }
 
-    protected function createCacheInstance(): CacheInterface
+    public function tearDown(): void
     {
-        return new FileCache(static::CACHE_DIRECTORY);
+        MockHelper::$time = null;
+        $this->removeDirectory($this->tmpDir);
+        $this->removeDirectory(__DIR__ . '/runtime');
     }
 
     /**
@@ -40,11 +65,8 @@ class FileCacheTest extends TestCase
      */
     public function testSet($key, $value): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
         for ($i = 0; $i < 2; $i++) {
-            $this->assertTrue($cache->set($key, $value));
+            $this->assertTrue($this->cache->set($key, $value));
         }
     }
 
@@ -58,11 +80,8 @@ class FileCacheTest extends TestCase
      */
     public function testGet($key, $value): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
-        $cache->set($key, $value);
-        $valueFromCache = $cache->get($key, 'default');
+        $this->cache->set($key, $value);
+        $valueFromCache = $this->cache->get($key, 'default');
 
         $this->assertSameExceptObject($value, $valueFromCache);
     }
@@ -77,11 +96,8 @@ class FileCacheTest extends TestCase
      */
     public function testValueInCacheCannotBeChanged($key, $value): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
-        $cache->set($key, $value);
-        $valueFromCache = $cache->get($key, 'default');
+        $this->cache->set($key, $value);
+        $valueFromCache = $this->cache->get($key, 'default');
 
         $this->assertSameExceptObject($value, $valueFromCache);
 
@@ -89,7 +105,7 @@ class FileCacheTest extends TestCase
             $originalValue = clone $value;
             $valueFromCache->test_field = 'changed';
             $value->test_field = 'changed';
-            $valueFromCacheNew = $cache->get($key, 'default');
+            $valueFromCacheNew = $this->cache->get($key, 'default');
             $this->assertSameExceptObject($originalValue, $valueFromCacheNew);
         }
     }
@@ -104,25 +120,19 @@ class FileCacheTest extends TestCase
      */
     public function testHas($key, $value): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
+        $this->cache->set($key, $value);
 
-        $cache->set($key, $value);
-
-        $this->assertTrue($cache->has($key));
+        $this->assertTrue($this->cache->has($key));
         // check whether exists affects the value
-        $this->assertSameExceptObject($value, $cache->get($key));
+        $this->assertSameExceptObject($value, $this->cache->get($key));
 
-        $this->assertTrue($cache->has($key));
-        $this->assertFalse($cache->has('not_exists'));
+        $this->assertTrue($this->cache->has($key));
+        $this->assertFalse($this->cache->has('not_exists'));
     }
 
     public function testGetNonExistent(): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
-        $this->assertNull($cache->get('non_existent_key'));
+        $this->assertNull($this->cache->get('non_existent_key'));
     }
 
     /**
@@ -135,14 +145,11 @@ class FileCacheTest extends TestCase
      */
     public function testDelete($key, $value): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
+        $this->cache->set($key, $value);
 
-        $cache->set($key, $value);
-
-        $this->assertSameExceptObject($value, $cache->get($key));
-        $this->assertTrue($cache->delete($key));
-        $this->assertNull($cache->get($key));
+        $this->assertSameExceptObject($value, $this->cache->get($key));
+        $this->assertTrue($this->cache->delete($key));
+        $this->assertNull($this->cache->get($key));
     }
 
     /**
@@ -155,8 +162,7 @@ class FileCacheTest extends TestCase
      */
     public function testClear($key, $value): void
     {
-        $cache = $this->createCacheInstance();
-        $cache = $this->prepare($cache);
+        $cache = $this->prepare($this->cache);
 
         $this->assertTrue($cache->clear());
         $this->assertNull($cache->get($key));
@@ -171,15 +177,11 @@ class FileCacheTest extends TestCase
      */
     public function testSetMultiple(?int $ttl): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
         $data = $this->getDataProviderData();
-
-        $cache->setMultiple($data, $ttl);
+        $this->cache->setMultiple($data, $ttl);
 
         foreach ($data as $key => $value) {
-            $this->assertSameExceptObject($value, $cache->get((string)$key));
+            $this->assertSameExceptObject($value, $this->cache->get((string) $key));
         }
     }
 
@@ -196,57 +198,39 @@ class FileCacheTest extends TestCase
 
     public function testGetMultiple(): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
         $data = $this->getDataProviderData();
         $keys = array_map('strval', array_keys($data));
+        $this->cache->setMultiple($data);
 
-        $cache->setMultiple($data);
-
-        $this->assertSameExceptObject($data, $cache->getMultiple($keys));
+        $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
     }
 
     public function testDeleteMultiple(): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
         $data = $this->getDataProviderData();
         $keys = array_map('strval', array_keys($data));
+        $this->cache->setMultiple($data);
 
-        $cache->setMultiple($data);
+        $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
 
-        $this->assertSameExceptObject($data, $cache->getMultiple($keys));
+        $this->cache->deleteMultiple($keys);
+        $emptyData = array_map(static fn () => null, $data);
 
-        $cache->deleteMultiple($keys);
-
-        $emptyData = array_map(static function ($v) {
-            return null;
-        }, $data);
-
-        $this->assertSameExceptObject($emptyData, $cache->getMultiple($keys));
+        $this->assertSameExceptObject($emptyData, $this->cache->getMultiple($keys));
     }
 
     public function testZeroAndNegativeTtl(): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-        $cache->setMultiple([
-            'a' => 1,
-            'b' => 2,
-        ]);
+        $this->cache->setMultiple(['a' => 1, 'b' => 2]);
 
-        $this->assertTrue($cache->has('a'));
-        $this->assertTrue($cache->has('b'));
+        $this->assertTrue($this->cache->has('a'));
+        $this->assertTrue($this->cache->has('b'));
 
-        $cache->set('a', 11, -1);
+        $this->cache->set('a', 11, -1);
+        $this->assertFalse($this->cache->has('a'));
 
-        $this->assertFalse($cache->has('a'));
-
-        $cache->set('b', 22, 0);
-
-        $this->assertFalse($cache->has('b'));
+        $this->cache->set('b', 22, 0);
+        $this->assertFalse($this->cache->has('b'));
     }
 
     /**
@@ -259,14 +243,13 @@ class FileCacheTest extends TestCase
      */
     public function testNormalizeTtl($ttl, $expectedResult): void
     {
-        $cache = new FileCache(static::CACHE_DIRECTORY);
-        $this->assertSameExceptObject($expectedResult, $this->invokeMethod($cache, 'normalizeTtl', [$ttl]));
+        $this->assertSameExceptObject($expectedResult, $this->invokeMethod($this->cache, 'normalizeTtl', [$ttl]));
     }
 
     /**
      * Data provider for {@see testNormalizeTtl()}
      *
-     * @throws \Exception
+     * @throws Exception
      *
      * @return array test data
      */
@@ -293,15 +276,16 @@ class FileCacheTest extends TestCase
     public function testTtlToExpiration($ttl, $expected): void
     {
         if ($expected === 'calculate_expiration') {
-            MockHelper::$time = \time();
+            MockHelper::$time = time();
             $expected = MockHelper::$time + $ttl;
         }
+
         if ($expected === 'calculate_max_expiration') {
-            MockHelper::$time = \time();
+            MockHelper::$time = time();
             $expected = MockHelper::$time + 31536000;
         }
-        $cache = new FileCache(static::CACHE_DIRECTORY);
-        $this->assertSameExceptObject($expected, $this->invokeMethod($cache, 'ttlToExpiration', [$ttl]));
+
+        $this->assertSameExceptObject($expected, $this->invokeMethod($this->cache, 'ttlToExpiration', [$ttl]));
     }
 
     public function ttlToExpirationProvider(): array
@@ -323,12 +307,9 @@ class FileCacheTest extends TestCase
      */
     public function testValuesAsIterable(array $array, iterable $iterable): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
+        $this->cache->setMultiple($iterable);
 
-        $cache->setMultiple($iterable);
-
-        $this->assertSameExceptObject($array, $cache->getMultiple(array_keys($array)));
+        $this->assertSameExceptObject($array, $this->cache->getMultiple(array_keys($array)));
     }
 
     public function iterableProvider(): array
@@ -340,14 +321,14 @@ class FileCacheTest extends TestCase
             ],
             'ArrayIterator' => [
                 ['a' => 1, 'b' => 2,],
-                new \ArrayIterator(['a' => 1, 'b' => 2,]),
+                new ArrayIterator(['a' => 1, 'b' => 2,]),
             ],
             'IteratorAggregate' => [
                 ['a' => 1, 'b' => 2,],
-                new class() implements \IteratorAggregate {
+                new class() implements IteratorAggregate {
                     public function getIterator()
                     {
-                        return new \ArrayIterator(['a' => 1, 'b' => 2,]);
+                        return new ArrayIterator(['a' => 1, 'b' => 2,]);
                     }
                 },
             ],
@@ -363,15 +344,12 @@ class FileCacheTest extends TestCase
 
     public function testExpire(): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
-        MockHelper::$time = \time();
-        $this->assertTrue($cache->set('expire_test', 'expire_test', 2));
+        MockHelper::$time = time();
+        $this->assertTrue($this->cache->set('expire_test', 'expire_test', 2));
         MockHelper::$time++;
-        $this->assertEquals('expire_test', $cache->get('expire_test'));
+        $this->assertEquals('expire_test', $this->cache->get('expire_test'));
         MockHelper::$time++;
-        $this->assertNull($cache->get('expire_test'));
+        $this->assertNull($this->cache->get('expire_test'));
     }
 
     /**
@@ -386,64 +364,44 @@ class FileCacheTest extends TestCase
             $this->markTestSkipped('Can not test without posix extension installed.');
         }
 
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-
         $cacheValue = uniqid('value_', false);
         $cacheKey = uniqid('key_', false);
 
-        MockHelper::$time = \time();
-        $this->assertTrue($cache->set($cacheKey, $cacheValue, 2));
-        $this->assertSame($cacheValue, $cache->get($cacheKey));
+        MockHelper::$time = time();
+        $this->assertTrue($this->cache->set($cacheKey, $cacheValue, 2));
+        $this->assertSame($cacheValue, $this->cache->get($cacheKey));
 
         // Override fileowner method so it always returns something not equal to the current user
         $notCurrentEuid = posix_geteuid() + 15;
         $this->getFunctionMock('Yiisoft\Cache\File', 'fileowner')->expects($this->any())->willReturn($notCurrentEuid);
-        $this->getFunctionMock('Yiisoft\Cache\File', 'unlink')->expects($this->once());
 
-        $this->assertTrue($cache->set($cacheKey, uniqid('value_2_', false), 2), 'Cannot rebuild cache on different file ownership');
+        $this->assertTrue(
+            $this->cache->set($cacheKey, uniqid('value_2_', false), 2),
+            'Cannot rebuild cache on different file ownership',
+        );
     }
 
     public function testSetWithDateIntervalTtl(): void
     {
-        $cache = $this->createCacheInstance();
-        $cache->clear();
+        $this->cache->set('a', 1, new DateInterval('PT1H'));
+        $this->assertSameExceptObject(1, $this->cache->get('a'));
 
-        $cache->set('a', 1, new DateInterval('PT1H'));
-        $this->assertSameExceptObject(1, $cache->get('a'));
-
-        $cache->setMultiple(['b' => 2]);
-        $this->assertSameExceptObject(['b' => 2], $cache->getMultiple(['b']));
+        $this->cache->setMultiple(['b' => 2]);
+        $this->assertSameExceptObject(['b' => 2], $this->cache->getMultiple(['b']));
     }
 
-    public function testCacheFileSuffix(): void
+    public function testFileSuffix(): void
     {
-        /** @var FileCache $cache */
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-        $cache->setCacheFileSuffix('.test');
+        $cache = $this->cache->withFileSuffix('.test');
+
+        $this->assertInstanceOf(FileCache::class, $cache);
+        $this->assertNotSame($this->cache, $cache);
 
         $cache->set('a', 1);
         $this->assertSameExceptObject(1, $cache->get('a'));
 
         $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
-
         $this->assertEquals('.test', substr($cacheFile, -5));
-    }
-
-    public function testDirectoryLevel(): void
-    {
-        /** @var FileCache $cache */
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-        $cache->setDirectoryLevel(0);
-
-        $cache->set('a', 1);
-        $this->assertSameExceptObject(1, $cache->get('a'));
-
-        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
-
-        $this->assertPathEquals(__DIR__ . '/runtime/cache/a.bin', $cacheFile);
     }
 
     public function testFileMode(): void
@@ -452,15 +410,16 @@ class FileCacheTest extends TestCase
             $this->markTestSkipped('Can not test permissions on Windows');
         }
 
-        $cache = new FileCache('/tmp/test_file_cache');
-        $cache->clear();
-        $cache->setFileMode(0755);
+        $cache = new FileCache($this->tmpDir);
+        $newCache = $cache->withFileMode(0755);
 
-        $cache->set('a', 1);
-        $this->assertSameExceptObject(1, $cache->get('a'));
+        $this->assertInstanceOf(FileCache::class, $newCache);
+        $this->assertNotSame($cache, $newCache);
 
-        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $newCache->set('a', 1);
+        $this->assertSameExceptObject(1, $newCache->get('a'));
 
+        $cacheFile = $this->invokeMethod($newCache, 'getCacheFile', ['a']);
         $permissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
 
         $this->assertEquals('0755', $permissions);
@@ -472,108 +431,169 @@ class FileCacheTest extends TestCase
             $this->markTestSkipped('Can not test permissions on Windows');
         }
 
-        $cache = new FileCache('/tmp/test_file_cache');
-        $cache->clear();
-        $cache->setDirMode(0755);
+        $cache = new FileCache($this->tmpDir);
+        $newCache = $cache->withDirectoryMode(0755);
 
-        $cache->set('a', 1);
-        $this->assertSameExceptObject(1, $cache->get('a'));
+        $this->assertInstanceOf(FileCache::class, $newCache);
+        $this->assertNotSame($cache, $newCache);
 
-        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $newCache->set('a', 1);
+        $this->assertSameExceptObject(1, $newCache->get('a'));
 
+        $cacheFile = $this->invokeMethod($newCache, 'getCacheFile', ['a']);
         $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
 
         $this->assertEquals('0755', $permissions);
     }
 
+    public function testDirectoryLevel(): void
+    {
+        $cache = $this->cache->withDirectoryLevel(0);
+
+        $this->assertInstanceOf(FileCache::class, $cache);
+        $this->assertNotSame($this->cache, $cache);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $this->assertPathEquals(__DIR__ . '/runtime/cache/a.bin', $cacheFile);
+    }
+
     public function testGcProbability(): void
     {
-        /** @var FileCache $cache */
-        $cache = $this->createCacheInstance();
-        $cache->clear();
-        $cache->setGcProbability(1000000);
+        $cache = $this->cache->withGcProbability(1000000);
+
+        $this->assertInstanceOf(FileCache::class, $cache);
+        $this->assertNotSame($this->cache, $cache);
 
         $key = 'gc_probability_test';
-
-        MockHelper::$time = \time();
+        MockHelper::$time = time();
 
         $cache->set($key, 1, 1);
-
         $this->assertSameExceptObject(1, $cache->get($key));
 
         $cacheFile = $this->invokeMethod($cache, 'getCacheFile', [$key]);
-
         $this->assertFileExists($cacheFile);
 
         MockHelper::$time++;
         MockHelper::$time++;
 
         $cache->set('b', 2);
-
         $this->assertFileDoesNotExist($cacheFile);
     }
 
-    public function testGetInvalidKey(): void
+    public function invalidKeyProvider(): array
     {
-        $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->get(1);
+        return [
+            'int' => [1],
+            'float' => [1.1],
+            'null' => [null],
+            'bool' => [true],
+            'object' => [new stdClass()],
+            'callable' => [fn () => 'key'],
+            'psr-reserved' => ['{}()/\@:'],
+            'empty-string' => [''],
+        ];
     }
 
-    public function testSetInvalidKey(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testGetInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->set(1, 1);
+        $this->cache->get($key);
     }
 
-    public function testDeleteInvalidKey(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testSetInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->delete(1);
+        $this->cache->set($key, 'value');
     }
 
-    public function testGetMultipleInvalidKeys(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testDeleteInvalidKey($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->getMultiple([true]);
+        $this->cache->delete($key);
     }
 
-    public function testGetMultipleInvalidKeysNotIterable(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testGetMultipleInvalidKeys($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->getMultiple(1);
+        $this->cache->getMultiple([$key]);
     }
 
-    public function testSetMultipleInvalidKeysNotIterable(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testGetMultipleInvalidKeysNotIterable($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->setMultiple(1);
+        $this->cache->getMultiple($key);
     }
 
-    public function testDeleteMultipleInvalidKeys(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testSetMultipleInvalidKeysNotIterable($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->deleteMultiple([true]);
+        $this->cache->setMultiple($key);
     }
 
-    public function testDeleteMultipleInvalidKeysNotIterable(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testDeleteMultipleInvalidKeys($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->deleteMultiple(1);
+        $this->cache->deleteMultiple([$key]);
     }
 
-    public function testHasInvalidKey(): void
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testDeleteMultipleInvalidKeysNotIterable($key): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $cache = $this->createCacheInstance();
-        $cache->has(1);
+        $this->cache->deleteMultiple($key);
+    }
+
+    /**
+     * @dataProvider invalidKeyProvider
+     *
+     * @param mixed $key
+     */
+    public function testHasInvalidKey($key): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->cache->has($key);
     }
 
     private function isWindows(): bool
@@ -591,5 +611,20 @@ class FileCacheTest extends TestCase
     private function normalizePath(string $path): string
     {
         return str_replace('\\', '/', $path);
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        if ($items = glob("{$directory}/*")) {
+            foreach ($items as $item) {
+                is_dir($item) ? $this->removeDirectory($item) : unlink($item);
+            }
+        }
+
+        rmdir($directory);
     }
 }
