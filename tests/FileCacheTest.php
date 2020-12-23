@@ -432,7 +432,7 @@ final class FileCacheTest extends TestCase
         }
 
         $cache = new FileCache($this->tmpDir);
-        $newCache = $cache->withDirMode(0755);
+        $newCache = $cache->withDirectoryMode(0755);
 
         $this->assertInstanceOf(FileCache::class, $newCache);
         $this->assertNotSame($cache, $newCache);

@@ -57,9 +57,7 @@ final class FileCache implements CacheInterface
     private const EXPIRATION_EXPIRED = -1;
 
     /**
-     * @var string The directory to store cache files. You may use path alias here.
-     *
-     * @see https://github.com/yiisoft/docs/blob/master/guide/en/concept/aliases.md
+     * @var string The directory to store cache files.
      */
     private string $cachePath;
 
@@ -81,7 +79,7 @@ final class FileCache implements CacheInterface
      * Defaults to 0775, meaning the directory is read-writable by owner and group,
      * but read-only for other users.
      */
-    private int $dirMode = 0775;
+    private int $directoryMode = 0775;
 
     /**
      * @var int The level of sub-directories to store cache files. Defaults to 1.
@@ -253,16 +251,16 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * @param int $dirMode The permission to be set for newly created directories.
+     * @param int $directoryMode The permission to be set for newly created directories.
      * This value will be used by PHP chmod() function. No umask will be applied.
      * Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
      *
      * @return self
      */
-    public function withDirMode(int $dirMode): self
+    public function withDirectoryMode(int $directoryMode): self
     {
         $new = clone $this;
-        $new->dirMode = $dirMode;
+        $new->directoryMode = $directoryMode;
         return $new;
     }
 
@@ -346,7 +344,7 @@ final class FileCache implements CacheInterface
      */
     private function createDirectoryIfNotExists(string $path): bool
     {
-        return is_dir($path) || (mkdir($path, $this->dirMode, true) && is_dir($path));
+        return is_dir($path) || (mkdir($path, $this->directoryMode, true) && is_dir($path));
     }
 
     /**
