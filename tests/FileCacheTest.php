@@ -298,6 +298,8 @@ final class FileCacheTest extends TestCase
             [3, 'calculate_expiration'],
             [null, 'calculate_max_expiration'],
             [-5, -1],
+            ['', -1],
+            [0, -1],
         ];
     }
 

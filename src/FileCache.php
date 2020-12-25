@@ -134,7 +134,7 @@ final class FileCache implements CacheInterface
         $this->gc();
         $expiration = $this->ttlToExpiration($ttl);
 
-        if ($expiration < 0) {
+        if ($expiration <= self::EXPIRATION_EXPIRED) {
             return $this->delete($key);
         }
 
