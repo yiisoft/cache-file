@@ -9,6 +9,6 @@ use Yiisoft\Cache\File\FileCache;
 
 return [
     FileCache::class => static fn (Aliases $aliases) => new FileCache(
-        $aliases->get($params['yiisoft/cache-file']['file-cache']['path'])
+        $aliases->get($params['yiisoft/cache-file']['fileCache']['path'])
     ),
 ];
