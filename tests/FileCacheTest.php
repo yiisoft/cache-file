@@ -46,13 +46,13 @@ final class FileCacheTest extends TestCase
     private FileCache $cache;
     private string $tmpDir;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         $this->cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache');
         $this->tmpDir = sys_get_temp_dir() . '/yiisoft-test-file-cache';
     }
 
-    public function tearDown(): void
+    protected function tearDown(): void
     {
         MockHelper::$time = null;
         $this->removeDirectory($this->tmpDir);
@@ -203,7 +203,7 @@ final class FileCacheTest extends TestCase
     public function testGetMultiple(): void
     {
         $data = $this->getDataProviderData();
-        $keys = array_map('strval', array_keys($data));
+        $keys = array_map('\strval', array_keys($data));
         $this->cache->setMultiple($data);
 
         $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
@@ -212,7 +212,7 @@ final class FileCacheTest extends TestCase
     public function testDeleteMultiple(): void
     {
         $data = $this->getDataProviderData();
-        $keys = array_map('strval', array_keys($data));
+        $keys = array_map('\strval', array_keys($data));
         $this->cache->setMultiple($data);
 
         $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
@@ -332,7 +332,7 @@ final class FileCacheTest extends TestCase
             'IteratorAggregate' => [
                 ['a' => 1, 'b' => 2,],
                 new class() implements IteratorAggregate {
-                    public function getIterator()
+                    public function getIterator(): ArrayIterator
                     {
                         return new ArrayIterator(['a' => 1, 'b' => 2,]);
                     }

@@ -197,7 +197,7 @@ final class FileCache implements CacheInterface
     public function setMultiple($values, $ttl = null): bool
     {
         $values = $this->iterableToArray($values);
-        $this->validateKeys(array_map('strval', array_keys($values)));
+        $this->validateKeys(array_map('\strval', array_keys($values)));
 
         foreach ($values as $key => $value) {
             $this->set((string) $key, $value, $ttl);
@@ -294,7 +294,7 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Converts TTL to expiration
+     * Converts TTL to expiration.
      *
      * @param DateInterval|int|null $ttl
      *
