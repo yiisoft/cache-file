@@ -331,7 +331,7 @@ final class FileCacheTest extends TestCase
             ],
             'IteratorAggregate' => [
                 ['a' => 1, 'b' => 2,],
-                new class() implements IteratorAggregate {
+                new class () implements IteratorAggregate {
                     public function getIterator(): ArrayIterator
                     {
                         return new ArrayIterator(['a' => 1, 'b' => 2,]);
