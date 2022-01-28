@@ -17,12 +17,16 @@
 
 This package implements file-based [PSR-16](https://www.php-fig.org/psr/psr-16/) cache.
 
+## Requirements
+
+- PHP 7.4 or higher.
+
 ## Installation
 
 The package could be installed with composer:
 
 ```
-composer require yiisoft/cache-file
+composer require yiisoft/cache-file --prefer-dist
 ```
 
 ## Configuration
@@ -117,6 +121,8 @@ To work with values in a more efficient manner, batch operations should be used:
 - `deleteMultiple()`
 
 This package can be used as a cache handler for the [Yii Caching Library](https://github.com/yiisoft/cache).
+
+## Testing
 
 ### Unit testing
 
