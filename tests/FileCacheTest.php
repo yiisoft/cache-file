@@ -379,7 +379,10 @@ final class FileCacheTest extends TestCase
 
         // Override fileowner method so it always returns something not equal to the current user
         $notCurrentEuid = posix_geteuid() + 15;
-        $this->getFunctionMock('Yiisoft\Cache\File', 'fileowner')->expects($this->any())->willReturn($notCurrentEuid);
+        $this
+            ->getFunctionMock('Yiisoft\Cache\File', 'fileowner')
+            ->expects($this->any())
+            ->willReturn($notCurrentEuid);
 
         $this->assertTrue(
             $this->cache->set($cacheKey, uniqid('value_2_', false), 2),
