@@ -1,6 +1,6 @@
 # Yii FileCache Change Log
 
-## 2.0.0 under development
+## 2.0.0 July 21, 2022
 
 - Chg #44: Raise the minimum `psr/simple-cache` version to `^2.0|^3.0` and the minimum PHP version to `^8.0` (@dehbka)
 
