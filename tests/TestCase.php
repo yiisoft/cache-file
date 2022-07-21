@@ -28,7 +28,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      *
      * @return mixed
      */
-    protected function invokeMethod(object $object, string $method, array $args = [], bool $revoke = true)
+    protected function invokeMethod(object $object, string $method, array $args = [], bool $revoke = true): mixed
     {
         $reflection = new ReflectionObject($object);
         $method = $reflection->getMethod($method);
@@ -76,7 +76,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      *
      * @return mixed
      */
-    protected function getInaccessibleProperty(object $object, string $propertyName, bool $revoke = true)
+    protected function getInaccessibleProperty(object $object, string $propertyName, bool $revoke = true): mixed
     {
         $class = new ReflectionClass($object);
 
@@ -116,7 +116,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         ];
     }
 
-    public function getDataProviderData($keyPrefix = ''): array
+    public function getDataProviderData(string $keyPrefix = ''): array
     {
         $data = [];
 
@@ -149,7 +149,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         return $cache;
     }
 
-    public function assertSameExceptObject($expected, $actual): void
+    public function assertSameExceptObject(mixed $expected, mixed $actual): void
     {
         // assert for all types
         $this->assertEquals($expected, $actual);

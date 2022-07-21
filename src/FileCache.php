@@ -19,11 +19,8 @@ use function filemtime;
 use function fileowner;
 use function fopen;
 use function function_exists;
-use function gettype;
 use function is_dir;
 use function is_file;
-use function is_iterable;
-use function is_string;
 use function iterator_to_array;
 use function opendir;
 use function posix_geteuid;
@@ -111,7 +108,7 @@ final class FileCache implements CacheInterface
         $this->cachePath = $cachePath;
     }
 
-    public function get($key, $default = null)
+    public function get(string $key, mixed $default = null): mixed
     {
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
@@ -128,7 +125,7 @@ final class FileCache implements CacheInterface
         return unserialize($value);
     }
 
-    public function set($key, $value, $ttl = null): bool
+    public function set(string $key, mixed $value, null|int|DateInterval $ttl = null): bool
     {
         $this->validateKey($key);
         $this->gc();
@@ -163,7 +160,7 @@ final class FileCache implements CacheInterface
         return touch($file, $expiration);
     }
 
-    public function delete($key): bool
+    public function delete(string $key): bool
     {
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
@@ -181,7 +178,7 @@ final class FileCache implements CacheInterface
         return true;
     }
 
-    public function getMultiple($keys, $default = null): iterable
+    public function getMultiple(iterable $keys, mixed $default = null): iterable
     {
         $keys = $this->iterableToArray($keys);
         $this->validateKeys($keys);
@@ -194,7 +191,7 @@ final class FileCache implements CacheInterface
         return $results;
     }
 
-    public function setMultiple($values, $ttl = null): bool
+    public function setMultiple(iterable $values, null|int|DateInterval $ttl = null): bool
     {
         $values = $this->iterableToArray($values);
         $this->validateKeys(array_map('\strval', array_keys($values)));
@@ -206,7 +203,7 @@ final class FileCache implements CacheInterface
         return true;
     }
 
-    public function deleteMultiple($keys): bool
+    public function deleteMultiple(iterable $keys): bool
     {
         $keys = $this->iterableToArray($keys);
         $this->validateKeys($keys);
@@ -218,7 +215,7 @@ final class FileCache implements CacheInterface
         return true;
     }
 
-    public function has($key): bool
+    public function has(string $key): bool
     {
         $this->validateKey($key);
         return $this->existsAndNotExpired($this->getCacheFile($key));
@@ -296,11 +293,11 @@ final class FileCache implements CacheInterface
     /**
      * Converts TTL to expiration.
      *
-     * @param DateInterval|int|null $ttl
+     * @param DateInterval|int|string|null $ttl
      *
      * @return int
      */
-    private function ttlToExpiration($ttl): int
+    private function ttlToExpiration(null|int|string|DateInterval $ttl = null): int
     {
         $ttl = $this->normalizeTtl($ttl);
 
@@ -322,7 +319,7 @@ final class FileCache implements CacheInterface
      *
      * @return int|null TTL value as UNIX timestamp or null meaning infinity
      */
-    private function normalizeTtl($ttl): ?int
+    private function normalizeTtl(null|int|string|DateInterval $ttl = null): ?int
     {
         if ($ttl === null) {
             return null;
@@ -365,7 +362,7 @@ final class FileCache implements CacheInterface
         $base = $this->cachePath;
 
         for ($i = 0; $i < $this->directoryLevel; ++$i) {
-            if (($prefix = substr($key, $i + $i, 2)) !== false) {
+            if (($prefix = substr($key, $i + $i, 2)) !== '') {
                 $base .= DIRECTORY_SEPARATOR . $prefix;
             }
         }
@@ -421,19 +418,13 @@ final class FileCache implements CacheInterface
         }
     }
 
-    /**
-     * @param mixed $key
-     */
-    private function validateKey($key): void
+    private function validateKey(string $key): void
     {
-        if (!is_string($key) || $key === '' || strpbrk($key, '{}()/\@:')) {
+        if ($key === '' || strpbrk($key, '{}()/\@:')) {
             throw new InvalidArgumentException('Invalid key value.');
         }
     }
 
-    /**
-     * @param array $keys
-     */
     private function validateKeys(array $keys): void
     {
         foreach ($keys as $key) {
@@ -441,11 +432,6 @@ final class FileCache implements CacheInterface
         }
     }
 
-    /**
-     * @param string $file
-     *
-     * @return bool
-     */
     private function existsAndNotExpired(string $file): bool
     {
         return is_file($file) && @filemtime($file) > time();
@@ -454,16 +440,12 @@ final class FileCache implements CacheInterface
     /**
      * Converts iterable to array. If provided value is not iterable it throws an InvalidArgumentException.
      *
-     * @param mixed $iterable
+     * @param iterable $iterable
      *
      * @return array
      */
-    private function iterableToArray($iterable): array
+    private function iterableToArray(iterable $iterable): array
     {
-        if (!is_iterable($iterable)) {
-            throw new InvalidArgumentException('Iterable is expected, got ' . gettype($iterable));
-        }
-
         /** @psalm-suppress RedundantCast */
         return $iterable instanceof Traversable ? iterator_to_array($iterable) : (array) $iterable;
     }

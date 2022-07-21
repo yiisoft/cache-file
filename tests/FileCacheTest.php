@@ -13,7 +13,6 @@ use IteratorAggregate;
 use phpmock\phpunit\PHPMock;
 use Psr\SimpleCache\InvalidArgumentException;
 use ReflectionException;
-use stdClass;
 use Yiisoft\Cache\File\CacheException;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
@@ -522,12 +521,6 @@ final class FileCacheTest extends TestCase
     public function invalidKeyProvider(): array
     {
         return [
-            'int' => [1],
-            'float' => [1.1],
-            'null' => [null],
-            'bool' => [true],
-            'object' => [new stdClass()],
-            'callable' => [fn () => 'key'],
             'psr-reserved' => ['{}()/\@:'],
             'empty-string' => [''],
         ];
@@ -582,43 +575,10 @@ final class FileCacheTest extends TestCase
      *
      * @param mixed $key
      */
-    public function testGetMultipleThrowExceptionForInvalidKeysNotIterable($key): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->cache->getMultiple($key);
-    }
-
-    /**
-     * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
-     */
-    public function testSetMultipleThrowExceptionForInvalidKeysNotIterable($key): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->cache->setMultiple($key);
-    }
-
-    /**
-     * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
-     */
     public function testDeleteMultipleThrowExceptionForInvalidKeys($key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->deleteMultiple([$key]);
-    }
-
-    /**
-     * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
-     */
-    public function testDeleteMultipleThrowExceptionForInvalidKeysNotIterable($key): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->cache->deleteMultiple($key);
     }
 
     /**
