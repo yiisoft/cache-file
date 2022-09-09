@@ -2,7 +2,7 @@
 
 ## 2.0.1 under development
 
-- no changes in this release.
+- Chg #47: Set permissions for new directory via `chmod()` (@dehbka)
 
 ## 2.0.0 July 21, 2022
 
