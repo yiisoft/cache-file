@@ -2,7 +2,7 @@
 
 ## 2.0.1 under development
 
-- no changes in this release.
+- Bug #47: Set permissions for new directory via `chmod()` (@dehbka)
 
 ## 2.0.0 July 21, 2022
 
@@ -10,7 +10,7 @@
 
 ## 1.0.1 March 23, 2021
 
-- Chg: Adjust config for new config plugin (samdark)
+- Chg: Adjust config for new config plugin (@samdark)
 
 ## 1.0.0 February 02, 2021
 

@@ -440,7 +440,7 @@ final class FileCacheTest extends TestCase
         }
 
         $cache = new FileCache($this->tmpDir);
-        $newCache = $cache->withDirectoryMode(0755);
+        $newCache = $cache->withDirectoryMode(0777);
 
         $this->assertInstanceOf(FileCache::class, $newCache);
         $this->assertNotSame($cache, $newCache);
@@ -451,7 +451,7 @@ final class FileCacheTest extends TestCase
         $cacheFile = $this->invokeMethod($newCache, 'getCacheFile', ['a']);
         $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
 
-        $this->assertEquals('0755', $permissions);
+        $this->assertEquals('0777', $permissions);
     }
 
     public function testDirectoryLevel(): void

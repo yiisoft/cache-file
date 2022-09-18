@@ -343,7 +343,17 @@ final class FileCache implements CacheInterface
      */
     private function createDirectoryIfNotExists(string $path): bool
     {
-        return is_dir($path) || (!is_file($path) && mkdir($path, $this->directoryMode, true) && is_dir($path));
+        if (is_dir($path)) {
+            return true;
+        }
+
+        $result = !is_file($path) && mkdir(directory: $path, recursive: true) && is_dir($path);
+
+        if ($result) {
+            chmod($path, $this->directoryMode);
+        }
+
+        return $result;
     }
 
     /**
