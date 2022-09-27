@@ -174,7 +174,6 @@ final class FileCacheTest extends TestCase
     /**
      * @dataProvider dataProviderSetMultiple
      *
-     * @param int|null $ttl
      *
      * @throws InvalidArgumentException
      */
@@ -239,12 +238,10 @@ final class FileCacheTest extends TestCase
     /**
      * @dataProvider dataProviderNormalizeTtl
      *
-     * @param mixed $ttl
-     * @param mixed $expectedResult
      *
      * @throws ReflectionException
      */
-    public function testNormalizeTtl($ttl, $expectedResult): void
+    public function testNormalizeTtl(mixed $ttl, mixed $expectedResult): void
     {
         $this->assertSameExceptObject($expectedResult, $this->invokeMethod($this->cache, 'normalizeTtl', [$ttl]));
     }
@@ -271,12 +268,10 @@ final class FileCacheTest extends TestCase
     /**
      * @dataProvider ttlToExpirationProvider
      *
-     * @param mixed $ttl
-     * @param mixed $expected
      *
      * @throws ReflectionException
      */
-    public function testTtlToExpiration($ttl, $expected): void
+    public function testTtlToExpiration(mixed $ttl, mixed $expected): void
     {
         if ($expected === 'calculate_expiration') {
             MockHelper::$time = time();
@@ -285,7 +280,7 @@ final class FileCacheTest extends TestCase
 
         if ($expected === 'calculate_max_expiration') {
             MockHelper::$time = time();
-            $expected = MockHelper::$time + 31536000;
+            $expected = MockHelper::$time + 31_536_000;
         }
 
         $this->assertSameExceptObject($expected, $this->invokeMethod($this->cache, 'ttlToExpiration', [$ttl]));
@@ -305,8 +300,6 @@ final class FileCacheTest extends TestCase
     /**
      * @dataProvider iterableProvider
      *
-     * @param array $array
-     * @param iterable $iterable
      *
      * @throws InvalidArgumentException
      */
@@ -324,11 +317,11 @@ final class FileCacheTest extends TestCase
                 ['a' => 1, 'b' => 2,],
                 ['a' => 1, 'b' => 2,],
             ],
-            'ArrayIterator' => [
+            \ArrayIterator::class => [
                 ['a' => 1, 'b' => 2,],
                 new ArrayIterator(['a' => 1, 'b' => 2,]),
             ],
-            'IteratorAggregate' => [
+            \IteratorAggregate::class => [
                 ['a' => 1, 'b' => 2,],
                 new class () implements IteratorAggregate {
                     public function getIterator(): ArrayIterator
@@ -470,7 +463,7 @@ final class FileCacheTest extends TestCase
 
     public function testGcProbability(): void
     {
-        $cache = $this->cache->withGcProbability(1000000);
+        $cache = $this->cache->withGcProbability(1_000_000);
 
         $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
@@ -528,10 +521,8 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
      */
-    public function testGetThrowExceptionForInvalidKey($key): void
+    public function testGetThrowExceptionForInvalidKey(mixed $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->get($key);
@@ -539,10 +530,8 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
      */
-    public function testSetThrowExceptionForInvalidKey($key): void
+    public function testSetThrowExceptionForInvalidKey(mixed $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->set($key, 'value');
@@ -550,10 +539,8 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
      */
-    public function testDeleteThrowExceptionForInvalidKey($key): void
+    public function testDeleteThrowExceptionForInvalidKey(mixed $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->delete($key);
@@ -561,10 +548,8 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
      */
-    public function testGetMultipleThrowExceptionForInvalidKeys($key): void
+    public function testGetMultipleThrowExceptionForInvalidKeys(mixed $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->getMultiple([$key]);
@@ -572,10 +557,8 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
      */
-    public function testDeleteMultipleThrowExceptionForInvalidKeys($key): void
+    public function testDeleteMultipleThrowExceptionForInvalidKeys(mixed $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->deleteMultiple([$key]);
@@ -583,10 +566,8 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider invalidKeyProvider
-     *
-     * @param mixed $key
      */
-    public function testHasThrowExceptionForInvalidKey($key): void
+    public function testHasThrowExceptionForInvalidKey(mixed $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->has($key);
