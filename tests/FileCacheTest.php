@@ -174,7 +174,6 @@ final class FileCacheTest extends TestCase
     /**
      * @dataProvider dataProviderSetMultiple
      *
-     *
      * @throws InvalidArgumentException
      */
     public function testSetMultiple(?int $ttl): void
@@ -238,7 +237,6 @@ final class FileCacheTest extends TestCase
     /**
      * @dataProvider dataProviderNormalizeTtl
      *
-     *
      * @throws ReflectionException
      */
     public function testNormalizeTtl(mixed $ttl, mixed $expectedResult): void
@@ -267,7 +265,6 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider ttlToExpirationProvider
-     *
      *
      * @throws ReflectionException
      */
@@ -299,7 +296,6 @@ final class FileCacheTest extends TestCase
 
     /**
      * @dataProvider iterableProvider
-     *
      *
      * @throws InvalidArgumentException
      */

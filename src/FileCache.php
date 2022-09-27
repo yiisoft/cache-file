@@ -28,7 +28,6 @@ use function random_int;
 use function readdir;
 use function rmdir;
 use function serialize;
-use function strncmp;
 use function strpbrk;
 use function substr;
 use function unlink;
@@ -282,8 +281,6 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts TTL to expiration.
-     *
-     *
      */
     private function ttlToExpiration(null|int|string|DateInterval $ttl = null): int
     {
@@ -437,8 +434,6 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts iterable to array. If provided value is not iterable it throws an InvalidArgumentException.
-     *
-     *
      */
     private function iterableToArray(iterable $iterable): array
     {

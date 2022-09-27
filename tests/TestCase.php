@@ -20,6 +20,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
      * Invokes a inaccessible method.
      *
      * @param bool $revoke whether to make method inaccessible after execution
+     *
      * @throws ReflectionException
      *
      * @return mixed
@@ -121,8 +122,8 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * This function configures given cache to match some expectations
      *
-     *
      * @throws InvalidArgumentException
+     *
      * @return CacheInterface
      */
     public function prepare(CacheInterface $cache): CacheInterface
