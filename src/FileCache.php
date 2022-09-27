@@ -28,7 +28,6 @@ use function random_int;
 use function readdir;
 use function rmdir;
 use function serialize;
-use function strncmp;
 use function strpbrk;
 use function substr;
 use function unlink;
@@ -49,7 +48,7 @@ use const LOCK_UN;
  */
 final class FileCache implements CacheInterface
 {
-    private const TTL_INFINITY = 31536000; // 1 year
+    private const TTL_INFINITY = 31_536_000; // 1 year
     private const EXPIRATION_EXPIRED = -1;
 
     /**
@@ -223,8 +222,6 @@ final class FileCache implements CacheInterface
 
     /**
      * @param string $fileSuffix The cache file suffix. Defaults to '.bin'.
-     *
-     * @return self
      */
     public function withFileSuffix(string $fileSuffix): self
     {
@@ -237,8 +234,6 @@ final class FileCache implements CacheInterface
      * @param int $fileMode The permission to be set for newly created cache files.
      * This value will be used by PHP chmod() function. No umask will be applied.
      * If not set, the permission will be determined by the current environment.
-     *
-     * @return self
      */
     public function withFileMode(int $fileMode): self
     {
@@ -251,8 +246,6 @@ final class FileCache implements CacheInterface
      * @param int $directoryMode The permission to be set for newly created directories.
      * This value will be used by PHP chmod() function. No umask will be applied.
      * Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
-     *
-     * @return self
      */
     public function withDirectoryMode(int $directoryMode): self
     {
@@ -266,8 +259,6 @@ final class FileCache implements CacheInterface
      * If the system has huge number of cache files (e.g. one million), you may use a bigger value
      * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
      * is not over burdened with a single directory having too many files.
-     *
-     * @return self
      */
     public function withDirectoryLevel(int $directoryLevel): self
     {
@@ -280,8 +271,6 @@ final class FileCache implements CacheInterface
      * @param int $gcProbability The probability (parts per million) that garbage collection (GC) should
      * be performed when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
      * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
-     *
-     * @return self
      */
     public function withGcProbability(int $gcProbability): self
     {
@@ -292,10 +281,6 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts TTL to expiration.
-     *
-     * @param DateInterval|int|string|null $ttl
-     *
-     * @return int
      */
     private function ttlToExpiration(null|int|string|DateInterval $ttl = null): int
     {
@@ -394,7 +379,7 @@ final class FileCache implements CacheInterface
         }
 
         while (($file = readdir($handle)) !== false) {
-            if (strncmp($file, '.', 1) === 0) {
+            if (str_starts_with($file, '.')) {
                 continue;
             }
 
@@ -423,7 +408,7 @@ final class FileCache implements CacheInterface
      */
     private function gc(): void
     {
-        if (random_int(0, 1000000) < $this->gcProbability) {
+        if (random_int(0, 1_000_000) < $this->gcProbability) {
             $this->removeCacheFiles($this->cachePath, true);
         }
     }
@@ -449,10 +434,6 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts iterable to array. If provided value is not iterable it throws an InvalidArgumentException.
-     *
-     * @param iterable $iterable
-     *
-     * @return array
      */
     private function iterableToArray(iterable $iterable): array
     {
