@@ -19,9 +19,6 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Invokes a inaccessible method.
      *
-     * @param object $object
-     * @param string $method
-     * @param array $args
      * @param bool $revoke whether to make method inaccessible after execution
      *
      * @throws ReflectionException
@@ -45,12 +42,9 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Sets an inaccessible object property to a designated value.
      *
-     * @param object $object
-     * @param string $propertyName
-     * @param mixed $value
      * @param bool $revoke whether to make property inaccessible after setting
      */
-    protected function setInaccessibleProperty(object $object, string $propertyName, $value, bool $revoke = true): void
+    protected function setInaccessibleProperty(object $object, string $propertyName, mixed $value, bool $revoke = true): void
     {
         $class = new ReflectionClass($object);
 
@@ -70,8 +64,6 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Gets an inaccessible object property.
      *
-     * @param object $object
-     * @param string $propertyName
      * @param bool $revoke whether to make property inaccessible after getting
      *
      * @return mixed
@@ -129,8 +121,6 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
     /**
      * This function configures given cache to match some expectations
-     *
-     * @param CacheInterface $cache
      *
      * @throws InvalidArgumentException
      *
