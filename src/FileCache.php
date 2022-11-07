@@ -169,7 +169,17 @@ final class FileCache implements CacheInterface
             return true;
         }
 
-        return @unlink($file);
+        $result = @unlink($file);
+        // Check if error was because of file was already deleted by another process on high load
+        if ($result === false) {
+            $lastError = error_get_last();
+            if (str_ends_with($lastError['message'] ?? '', 'No such file or directory')) {
+                error_clear_last();
+                return true;
+            }
+        }
+
+        return $result;
     }
 
     public function clear(): bool
