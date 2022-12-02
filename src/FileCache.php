@@ -153,10 +153,18 @@ final class FileCache implements CacheInterface
         }
 
         if ($this->fileMode !== null) {
-            chmod($file, $this->fileMode);
+            $result = @chmod($file, $this->fileMode);
+            if ($this->isLastErrorNotSafe($result)) {
+                return false;
+            }
         }
 
-        return touch($file, $expiration);
+        $result = @touch($file, $expiration);
+        if ($this->isLastErrorNotSafe($result)) {
+            return false;
+        }
+
+        return true;
     }
 
     public function delete(string $key): bool
@@ -169,16 +177,11 @@ final class FileCache implements CacheInterface
         }
 
         $result = @unlink($file);
-        // Check if error was because of file was already deleted by another process on high load
-        if ($result === false) {
-            $lastError = error_get_last();
-            if (str_ends_with($lastError['message'] ?? '', 'No such file or directory')) {
-                error_clear_last();
-                return true;
-            }
+        if ($this->isLastErrorNotSafe($result)) {
+            return false;
         }
 
-        return $result;
+        return true;
     }
 
     public function clear(): bool
@@ -449,5 +452,28 @@ final class FileCache implements CacheInterface
     {
         /** @psalm-suppress RedundantCast */
         return $iterable instanceof Traversable ? iterator_to_array($iterable) : (array) $iterable;
+    }
+
+    /**
+     * Check if error was because of file was already deleted by another process on high load
+     */
+    private function isLastErrorNotSafe(mixed $result): bool
+    {
+        if ($result !== false) {
+            return false;
+        }
+
+        $lastError = error_get_last();
+
+        if ($lastError === null) {
+            return false;
+        }
+
+        if (str_ends_with($lastError['message'] ?? '', 'No such file or directory')) {
+            error_clear_last();
+            return false;
+        }
+
+        return true;
     }
 }
