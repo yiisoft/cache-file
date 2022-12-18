@@ -313,11 +313,11 @@ final class FileCacheTest extends TestCase
                 ['a' => 1, 'b' => 2,],
                 ['a' => 1, 'b' => 2,],
             ],
-            \ArrayIterator::class => [
+            'ArrayIterator' => [
                 ['a' => 1, 'b' => 2,],
                 new ArrayIterator(['a' => 1, 'b' => 2,]),
             ],
-            \IteratorAggregate::class => [
+            'IteratorAggregate' => [
                 ['a' => 1, 'b' => 2,],
                 new class () implements IteratorAggregate {
                     public function getIterator(): ArrayIterator
