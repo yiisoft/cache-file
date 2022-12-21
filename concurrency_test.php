@@ -55,3 +55,4 @@ foreach (range(1, $threadsTotal) as $i) {
     }
 }
 pcntl_wait($status);
+exit($status);
