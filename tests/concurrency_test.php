@@ -16,7 +16,7 @@
  * It happens in commands like `chmod`, `touch` after file creation or deletion
  * To fix these problems `FileCache::isLastErrorNotSafe()` result handler created
  */
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);

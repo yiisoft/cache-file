@@ -9,7 +9,7 @@ final class ConcurrencyTest extends TestCase
     public function testConcurrency(): void
     {
         $exitCode = null;
-        $result = exec('php ' . __DIR__ . '/../concurrency_test.php', $output, $exitCode);
+        $result = exec('php ' . __DIR__ . '/concurrency_test.php', $output, $exitCode);
         $output = implode("\n", $output);
         $this->assertStringNotContainsString('1', $output);
         $this->assertStringNotContainsString('2', $output);
