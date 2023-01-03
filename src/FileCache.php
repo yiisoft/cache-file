@@ -154,17 +154,14 @@ final class FileCache implements CacheInterface
 
         if ($this->fileMode !== null) {
             $result = @chmod($file, $this->fileMode);
-            if ($this->isLastErrorNotSafe($result)) {
+            if (!$this->isLastErrorSafe($result)) {
                 return false;
             }
         }
 
         $result = @touch($file, $expiration);
-        if ($this->isLastErrorNotSafe($result)) {
-            return false;
-        }
 
-        return true;
+        return $this->isLastErrorSafe($result);
     }
 
     public function delete(string $key): bool
@@ -177,11 +174,8 @@ final class FileCache implements CacheInterface
         }
 
         $result = @unlink($file);
-        if ($this->isLastErrorNotSafe($result)) {
-            return false;
-        }
 
-        return true;
+        return $this->isLastErrorSafe($result);
     }
 
     public function clear(): bool
@@ -457,23 +451,23 @@ final class FileCache implements CacheInterface
     /**
      * Check if error was because of file was already deleted by another process on high load
      */
-    private function isLastErrorNotSafe(mixed $result): bool
+    private function isLastErrorSafe(mixed $result): bool
     {
         if ($result !== false) {
-            return false;
+            return true;
         }
 
         $lastError = error_get_last();
 
         if ($lastError === null) {
-            return false;
+            return true;
         }
 
         if (str_ends_with($lastError['message'] ?? '', 'No such file or directory')) {
             error_clear_last();
-            return false;
+            return true;
         }
 
-        return true;
+        return false;
     }
 }
