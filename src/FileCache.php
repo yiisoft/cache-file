@@ -451,7 +451,7 @@ final class FileCache implements CacheInterface
     /**
      * Check if error was because of file was already deleted by another process on high load
      */
-    private function isLastErrorSafe(mixed $result): bool
+    private function isLastErrorSafe(bool $result): bool
     {
         if ($result !== false) {
             return true;
