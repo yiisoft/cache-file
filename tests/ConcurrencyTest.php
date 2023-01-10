@@ -6,6 +6,10 @@ namespace Yiisoft\Cache\File\Tests;
 
 final class ConcurrencyTest extends TestCase
 {
+    /**
+     * @requires extension pcntl
+     * @requires OSFAMILY Linux
+     */
     public function testConcurrency(): void
     {
         $exitCode = null;
