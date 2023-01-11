@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * @author sartor
  * This file is a simple test for high concurrency heavy load for FileCache
@@ -37,20 +39,20 @@ foreach (range(1, $threadsTotal) as $i) {
     $pid = pcntl_fork();
     if ($pid === -1) {
         echo "unable to fork\n";
-    } else if ($pid === 0) {
+    } elseif ($pid === 0) {
         foreach (range(1, 10) as $j) {
             $result = $cache->set('k', $i);
             if ($result === false) {
-                echo "1";
+                echo '1';
                 exit(1);
             }
             $result = $cache->delete('k');
             if ($result === false) {
-                echo "2";
+                echo '2';
                 exit(1);
             }
         }
-        echo "-";
+        echo '-';
         exit();
     }
 }
