@@ -30,8 +30,8 @@ final class ConfigTest extends TestCase
                     Aliases::class => [
                         '__construct()' => [
                             [
-                                '@runtime' => __DIR__.'/environment',
-                            ]
+                                '@runtime' => __DIR__ . '/environment',
+                            ],
                         ],
                     ],
                 ]
