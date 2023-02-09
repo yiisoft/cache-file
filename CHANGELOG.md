@@ -2,7 +2,9 @@
 
 ## 2.0.2 under development
 
-- no changes in this release.
+- Chg #50: Do not throw exception on file delete when file not found (fix for high concurrency load) (@sartor)
+- Chg #52: Do not throw exception on change mode and modification time of cache file (fix for high
+  concurrency load) (@sartor)
 
 ## 2.0.1 September 18, 2022
 

@@ -6,8 +6,6 @@ namespace Yiisoft\Cache\File;
 
 /**
  * Mock for the time() function
- *
- * @return int
  */
 function time(): int
 {
