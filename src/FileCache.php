@@ -440,12 +440,11 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Converts iterable to array. If provided value is not iterable it throws an InvalidArgumentException.
+     * Converts iterable to array.
      */
     private function iterableToArray(iterable $iterable): array
     {
-        /** @psalm-suppress RedundantCast */
-        return $iterable instanceof Traversable ? iterator_to_array($iterable) : (array) $iterable;
+        return $iterable instanceof Traversable ? iterator_to_array($iterable) : $iterable;
     }
 
     /**
