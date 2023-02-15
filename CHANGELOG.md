@@ -1,5 +1,9 @@
 # Yii FileCache Change Log
 
+## 3.0.1 under development
+
+- no changes in this release.
+
 ## 3.0.0 February 15, 2023
 
 - Chg #50: Do not throw exception on file delete when file not found (fix for high concurrency load) (@sartor)
