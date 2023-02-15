@@ -1,6 +1,6 @@
 # Yii FileCache Change Log
 
-## 2.0.2 under development
+## 3.0.0 February 15, 2023
 
 - Chg #50: Do not throw exception on file delete when file not found (fix for high concurrency load) (@sartor)
 - Chg #52: Do not throw exception on change mode and modification time of cache file (fix for high
