@@ -53,7 +53,7 @@ foreach (range(1, $threadsTotal) as $i) {
             }
         }
         echo '-';
-        exit();
+        exit;
     }
 }
 pcntl_wait($status);
