@@ -422,7 +422,7 @@ final class FileCacheTest extends TestCase
         $this->assertEquals('0755', $permissions);
     }
 
-    public function testDirMode(): void
+    public function testDirModeDeprecated(): void
     {
         if ($this->isWindows()) {
             $this->markTestSkipped('Can not test permissions on Windows');
@@ -440,6 +440,29 @@ final class FileCacheTest extends TestCase
         $cacheFile = $this->invokeMethod($newCache, 'getCacheFile', ['a']);
         $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
 
+        $this->assertEquals('0777', $permissions);
+    }
+
+    public function testDirMode(): void
+    {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Can not test permissions on Windows');
+        }
+
+        $cache = new FileCache($this->tmpDir, 0777);
+
+        $this->assertInstanceOf(FileCache::class, $cache);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
+
+        $this->assertEquals('0777', $permissions);
+
+        // also check top level cache dir permissions
+        $permissions = substr(sprintf('%o', fileperms($this->tmpDir)), -4);
         $this->assertEquals('0777', $permissions);
     }
 

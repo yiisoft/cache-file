@@ -50,6 +50,7 @@ final class FileCache implements CacheInterface
 {
     private const TTL_INFINITY = 31_536_000; // 1 year
     private const EXPIRATION_EXPIRED = -1;
+    private const DEFAULT_DIRMODE = 0775;
 
     /**
      * @var string The directory to store cache files.
@@ -74,7 +75,7 @@ final class FileCache implements CacheInterface
      * Defaults to 0775, meaning the directory is read-writable by owner and group,
      * but read-only for other users.
      */
-    private int $directoryMode = 0775;
+    private int $directoryMode = self::DEFAULT_DIRMODE;
 
     /**
      * @var int The level of sub-directories to store cache files. Defaults to 1.
@@ -93,13 +94,18 @@ final class FileCache implements CacheInterface
 
     /**
      * @param string $cachePath The directory to store cache files.
+     * @param int $directoryMode The permission to be set for newly created directories.
+     *      This value will be used by PHP chmod() function. No umask will be applied.
+     *      Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
      *
      * @see FileCache::$cachePath
      *
      * @throws CacheException If failed to create cache directory.
      */
-    public function __construct(string $cachePath)
+    public function __construct(string $cachePath, int $directoryMode = self::DEFAULT_DIRMODE)
     {
+        $this->directoryMode = $directoryMode;
+
         if (!$this->createDirectoryIfNotExists($cachePath)) {
             throw new CacheException("Failed to create cache directory \"{$cachePath}\".");
         }
@@ -253,6 +259,8 @@ final class FileCache implements CacheInterface
      * @param int $directoryMode The permission to be set for newly created directories.
      * This value will be used by PHP chmod() function. No umask will be applied.
      * Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
+     *
+     * @deprecated Use $directoryMode in the constructor instead
      */
     public function withDirectoryMode(int $directoryMode): self
     {

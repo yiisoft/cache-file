@@ -38,6 +38,15 @@ the path to the base directory in which the cache files will be stored:
 $cache = new \Yiisoft\Cache\File\FileCache('/path/to/directory');
 ```
 
+Change the permission to be set for newly created directories:
+
+```php
+$cache = new \Yiisoft\Cache\File\FileCache('/path/to/directory', 0777); // default is 0775
+```
+
+This value will be used by PHP `chmod()` function. No umask will be applied. Defaults to 0775,
+meaning the directory is read-writable by an owner and group, but read-only for other users.
+
 Change the suffix of the cache files:
 
 ```php
@@ -52,15 +61,6 @@ $cache = $cache->withFileMode(0644); // default is null
 
 This value will be used by PHP `chmod()` function. No umask will be applied.
 If not set, the permission will be determined by the current environment.
-
-Change the permission to be set for newly created directories:
-
-```php
-$cache = $cache->withDirectoryMode(0777); // default is 0775
-```
-
-This value will be used by PHP `chmod()` function. No umask will be applied. Defaults to 0775,
-meaning the directory is read-writable by an owner and group, but read-only for other users.
 
 Change the level of sub-directories to store cache files:
 

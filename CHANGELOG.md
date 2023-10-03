@@ -2,7 +2,7 @@
 
 ## 3.0.1 under development
 
-- no changes in this release.
+- Chg #69: Set directoryMode via constructor and deprecate `withDirectoryMode()`
 
 ## 3.0.0 February 15, 2023
 
