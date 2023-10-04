@@ -6,7 +6,6 @@ namespace Yiisoft\Cache\File;
 
 use DateInterval;
 use DateTime;
-use Exception;
 use Psr\SimpleCache\CacheInterface;
 use Traversable;
 
