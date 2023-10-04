@@ -70,14 +70,6 @@ final class FileCache implements CacheInterface
     private ?int $fileMode = null;
 
     /**
-     * @var int The permission to be set for newly created directories.
-     * This value will be used by PHP chmod() function. No umask will be applied.
-     * Defaults to 0775, meaning the directory is read-writable by owner and group,
-     * but read-only for other users.
-     */
-    private int $directoryMode = self::DEFAULT_DIRECTORY_MODE;
-
-    /**
      * @var int The level of sub-directories to store cache files. Defaults to 1.
      * If the system has huge number of cache files (e.g. one million), you may use a bigger value
      * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
@@ -94,18 +86,18 @@ final class FileCache implements CacheInterface
 
     /**
      * @param string $cachePath The directory to store cache files.
-     * @param int $directoryMode The permission to be set for newly created directories.
-     *      This value will be used by PHP chmod() function. No umask will be applied.
-     *      Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
+     * @param int $directoryMode The permission to be set for newly created directories. This value will be used
+     * by PHP `chmod()` function. No umask will be applied. Defaults to 0775, meaning the directory is read-writable
+     * by owner and group, but read-only for other users.
      *
      * @see FileCache::$cachePath
      *
      * @throws CacheException If failed to create cache directory.
      */
-    public function __construct(string $cachePath, int $directoryMode = self::DEFAULT_DIRECTORY_MODE)
-    {
-        $this->directoryMode = $directoryMode;
-
+    public function __construct(
+        string $cachePath,
+        private int $directoryMode = self::DEFAULT_DIRECTORY_MODE,
+    ) {
         if (!$this->createDirectoryIfNotExists($cachePath)) {
             throw new CacheException("Failed to create cache directory \"{$cachePath}\".");
         }
