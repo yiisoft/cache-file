@@ -4,6 +4,7 @@
 
 - Chg #69: Add optional parameter `$directoryMode` to `FileCache` constructor and deprecate `withDirectoryMode()`
   method (@particleflux)
+- Enh #70: Minor refactoring with PHP 8 features usage (@vjik)
 
 ## 3.0.0 February 15, 2023
 
