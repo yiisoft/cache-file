@@ -260,7 +260,7 @@ final class FileCache implements CacheInterface
      * This value will be used by PHP chmod() function. No umask will be applied.
      * Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
      *
-     * @deprecated Use $directoryMode in the constructor instead
+     * @deprecated Use `$directoryMode` in the constructor instead
      */
     public function withDirectoryMode(int $directoryMode): self
     {
