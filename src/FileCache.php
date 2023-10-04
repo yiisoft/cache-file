@@ -75,7 +75,7 @@ final class FileCache implements CacheInterface
      * Defaults to 0775, meaning the directory is read-writable by owner and group,
      * but read-only for other users.
      */
-    private int $directoryMode = self::DEFAULT_DIRMODE;
+    private int $directoryMode = self::DEFAULT_DIRECTORY_MODE;
 
     /**
      * @var int The level of sub-directories to store cache files. Defaults to 1.
