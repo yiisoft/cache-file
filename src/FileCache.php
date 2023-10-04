@@ -102,7 +102,7 @@ final class FileCache implements CacheInterface
      *
      * @throws CacheException If failed to create cache directory.
      */
-    public function __construct(string $cachePath, int $directoryMode = self::DEFAULT_DIRMODE)
+    public function __construct(string $cachePath, int $directoryMode = self::DEFAULT_DIRECTORY_MODE)
     {
         $this->directoryMode = $directoryMode;
 
