@@ -2,7 +2,8 @@
 
 ## 3.0.1 under development
 
-- Chg #69: Set directoryMode via constructor and deprecate `withDirectoryMode()`
+- Chg #69: Add optional parameter `$directoryMode` to `FileCache` constructor and deprecate `withDirectoryMode()`
+  method (@particleflux)
 
 ## 3.0.0 February 15, 2023
 
