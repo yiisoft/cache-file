@@ -21,7 +21,6 @@ on:
       - 'phpunit.xml.dist'
       - 'psalm.xml'
 
-
 name: backwards compatibility
 jobs:
   roave_bc_check:
