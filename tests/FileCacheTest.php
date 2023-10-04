@@ -443,7 +443,7 @@ final class FileCacheTest extends TestCase
         $this->assertEquals('0777', $permissions);
     }
 
-    public function testDirMode(): void
+    public function testDirectoryMode(): void
     {
         if ($this->isWindows()) {
             $this->markTestSkipped('Can not test permissions on Windows');
