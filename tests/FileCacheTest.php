@@ -422,7 +422,7 @@ final class FileCacheTest extends TestCase
         $this->assertEquals('0755', $permissions);
     }
 
-    public function testDirModeDeprecated(): void
+    public function testDirectoryModeDeprecated(): void
     {
         if ($this->isWindows()) {
             $this->markTestSkipped('Can not test permissions on Windows');
