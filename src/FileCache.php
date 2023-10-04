@@ -50,7 +50,7 @@ final class FileCache implements CacheInterface
 {
     private const TTL_INFINITY = 31_536_000; // 1 year
     private const EXPIRATION_EXPIRED = -1;
-    private const DEFAULT_DIRMODE = 0775;
+    private const DEFAULT_DIRECTORY_MODE = 0775;
 
     /**
      * @var string The directory to store cache files.
