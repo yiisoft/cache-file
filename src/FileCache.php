@@ -6,7 +6,6 @@ namespace Yiisoft\Cache\File;
 
 use DateInterval;
 use DateTime;
-use Exception;
 use Psr\SimpleCache\CacheInterface;
 use Traversable;
 
@@ -38,24 +37,18 @@ use const LOCK_SH;
 use const LOCK_UN;
 
 /**
- * FileCache implements a cache handler using files.
+ * `FileCache` implements a cache handler using files.
  *
- * For each data value being cached, FileCache will store it in a separate file.
- * The cache files are placed under {@see FileCache::$cachePath}.
- * FileCache will perform garbage collection automatically to remove expired cache files.
+ * For each data value being cached, `FileCache` will store it in a separate file. The cache files are placed
+ * under {@see FileCache::$cachePath}. `FileCache` will perform garbage collection automatically to remove expired
+ * cache files.
  *
- * Please refer to {@see \Psr\SimpleCache\CacheInterface} for common cache operations that are supported by FileCache.
+ * Please refer to {@see CacheInterface} for common cache operations that are supported by `FileCache`.
  */
 final class FileCache implements CacheInterface
 {
     private const TTL_INFINITY = 31_536_000; // 1 year
     private const EXPIRATION_EXPIRED = -1;
-    private const DEFAULT_DIRECTORY_MODE = 0775;
-
-    /**
-     * @var string The directory to store cache files.
-     */
-    private string $cachePath;
 
     /**
      * @var string The cache file suffix. Defaults to '.bin'.
@@ -95,14 +88,12 @@ final class FileCache implements CacheInterface
      * @throws CacheException If failed to create cache directory.
      */
     public function __construct(
-        string $cachePath,
-        private int $directoryMode = self::DEFAULT_DIRECTORY_MODE,
+        private string $cachePath,
+        private int $directoryMode = 0775,
     ) {
         if (!$this->createDirectoryIfNotExists($cachePath)) {
-            throw new CacheException("Failed to create cache directory \"{$cachePath}\".");
+            throw new CacheException("Failed to create cache directory \"$cachePath\".");
         }
-
-        $this->cachePath = $cachePath;
     }
 
     public function get(string $key, mixed $default = null): mixed
@@ -135,8 +126,10 @@ final class FileCache implements CacheInterface
         $file = $this->getCacheFile($key);
         $cacheDirectory = dirname($file);
 
-        if (!is_dir($this->cachePath) || ($this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($cacheDirectory))) {
-            throw new CacheException("Failed to create cache directory \"{$cacheDirectory}\".");
+        if (!is_dir($this->cachePath)
+            || $this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($cacheDirectory)
+        ) {
+            throw new CacheException("Failed to create cache directory \"$cacheDirectory\".");
         }
 
         // If ownership differs the touch call will fail, so we try to
@@ -236,9 +229,9 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * @param int $fileMode The permission to be set for newly created cache files.
-     * This value will be used by PHP chmod() function. No umask will be applied.
-     * If not set, the permission will be determined by the current environment.
+     * @param int $fileMode The permission to be set for newly created cache files. This value will be used
+     * by PHP `chmod()` function. No umask will be applied. If not set, the permission will be determined
+     * by the current environment.
      */
     public function withFileMode(int $fileMode): self
     {
@@ -248,9 +241,9 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * @param int $directoryMode The permission to be set for newly created directories.
-     * This value will be used by PHP chmod() function. No umask will be applied.
-     * Defaults to 0775, meaning the directory is read-writable by owner and group, but read-only for other users.
+     * @param int $directoryMode The permission to be set for newly created directories. This value will be used
+     * by PHP `chmod()` function. No umask will be applied. Defaults to 0775, meaning the directory is read-writable
+     * by owner and group, but read-only for other users.
      *
      * @deprecated Use `$directoryMode` in the constructor instead
      */
@@ -410,8 +403,6 @@ final class FileCache implements CacheInterface
 
     /**
      * Removes expired cache files.
-     *
-     * @throws Exception
      */
     private function gc(): void
     {
@@ -448,7 +439,7 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Check if error was because of file was already deleted by another process on high load
+     * Check if error was because of file was already deleted by another process on high load.
      */
     private function isLastErrorSafe(bool $result): bool
     {
