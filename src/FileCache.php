@@ -127,7 +127,7 @@ final class FileCache implements CacheInterface
         $cacheDirectory = dirname($file);
 
         if (!is_dir($this->cachePath)
-            || ($this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($cacheDirectory))
+            || $this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($cacheDirectory)
         ) {
             throw new CacheException("Failed to create cache directory \"$cacheDirectory\".");
         }
