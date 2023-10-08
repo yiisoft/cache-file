@@ -480,6 +480,30 @@ final class FileCacheTest extends TestCase
         $this->assertPathEquals(__DIR__ . '/runtime/cache/a.bin', $cacheFile);
     }
 
+    /**
+     * @dataProvider nestedDirectoriesDataProvider
+     */
+    public function testDirectoryLevelWithSubdirs(int $directoryLevel, string $key, string $expectedPath): void
+    {
+        $cache = $this->cache->withDirectoryLevel($directoryLevel);
+
+        $cache->set($key, 1);
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', [$key]);
+        $this->assertPathEquals(__DIR__ . "/runtime/cache/$expectedPath.bin", $cacheFile);
+    }
+
+    public function nestedDirectoriesDataProvider(): array
+    {
+        return [
+            'single level' => [1, '0123456789', '01/0123456789'],
+            'two levels, normal key' => [2, '0123456789', '01/23/0123456789'],
+            'two levels, short key' => [2, '012', '01/2/012'],
+            'two levels, too short key' => [2, '0', '0/0'],
+            'three levels, normal key' => [3, '0123456789', '01/23/45/0123456789'],
+        ];
+    }
+
     public function testGcProbability(): void
     {
         $cache = $this->cache->withGcProbability(1_000_000);
