@@ -1,5 +1,9 @@
 # Yii FileCache Change Log
 
+## 3.1.1 under development
+
+- no changes in this release.
+
 ## 3.1.0 October 09, 2023
 
 - Chg #69: Add optional parameter `$directoryMode` to `FileCache` constructor and deprecate `withDirectoryMode()`
