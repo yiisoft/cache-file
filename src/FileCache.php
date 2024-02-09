@@ -418,6 +418,9 @@ final class FileCache implements CacheInterface
         }
     }
 
+    /**
+     * @param string[] $keys
+     */
     private function validateKeys(array $keys): void
     {
         foreach ($keys as $key) {
@@ -432,6 +435,11 @@ final class FileCache implements CacheInterface
 
     /**
      * Converts iterable to array.
+     *
+     * @psalm-template TKey
+     * @psalm-template TValue
+     * @psalm-param iterable<TKey, TValue> $iterable
+     * @psalm-return array<TKey, TValue>
      */
     private function iterableToArray(iterable $iterable): array
     {
