@@ -1,4 +1,4 @@
-# Yii FileCache Change Log
+# Yii Cache Library - File Handler Change Log
 
 ## 3.1.1 under development
 
