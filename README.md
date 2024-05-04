@@ -23,7 +23,7 @@ This package implements file-based [PSR-16](https://www.php-fig.org/psr/psr-16/)
 
 ## Installation
 
-The package could be installed with composer:
+The package could be installed with [composer](https://getcomposer.org/download/)
 
 ```shell
 composer require yiisoft/cache-file
