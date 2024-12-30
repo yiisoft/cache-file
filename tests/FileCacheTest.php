@@ -650,7 +650,6 @@ final class FileCacheTest extends TestCase
 
     public function testSetClearsStatCache(): void
     {
-
         $this->cache->set(__FUNCTION__, 'cache1', 2);
 
         $refClass = new \ReflectionClass($this->cache);
