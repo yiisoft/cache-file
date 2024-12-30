@@ -150,7 +150,12 @@ final class FileCache implements CacheInterface
             }
         }
 
-        $result = @touch($file, $expiration);
+        $result = false;
+
+        if (@touch($file, $expiration)) {
+            clearstatcache();
+            $result = true;
+        }
 
         return $this->isLastErrorSafe($result);
     }
