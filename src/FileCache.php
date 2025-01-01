@@ -153,7 +153,7 @@ final class FileCache implements CacheInterface
         $result = false;
 
         if (@touch($file, $expiration)) {
-            clearstatcache(false, $file);
+            clearstatcache();
             $result = true;
         }
 
