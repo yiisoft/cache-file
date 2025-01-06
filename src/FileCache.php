@@ -132,7 +132,7 @@ final class FileCache implements CacheInterface
             throw new CacheException("Failed to create cache directory \"$cacheDirectory\".");
         }
 
-        // If ownership differs the touch call will fail, so we try to
+        // If ownership differs, the touch call will fail, so we try to
         // rebuild the file from scratch by deleting it first
         // https://github.com/yiisoft/yii2/pull/16120
         if (function_exists('posix_geteuid') && is_file($file) && fileowner($file) !== posix_geteuid()) {
@@ -150,7 +150,12 @@ final class FileCache implements CacheInterface
             }
         }
 
-        $result = @touch($file, $expiration);
+        $result = false;
+
+        if (@touch($file, $expiration)) {
+            clearstatcache();
+            $result = true;
+        }
 
         return $this->isLastErrorSafe($result);
     }

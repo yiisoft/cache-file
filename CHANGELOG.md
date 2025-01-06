@@ -2,7 +2,7 @@
 
 ## 3.1.1 under development
 
-- no changes in this release.
+- Bug #85: Clear stat cache in `FileCache::set()` (@samdark)
 
 ## 3.1.0 October 09, 2023
 
