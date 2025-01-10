@@ -314,7 +314,7 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Ensures that the directory is existing.
+     * Ensures that the directory exists.
      *
      * @param string $path The path to the directory.
      */
