@@ -325,7 +325,7 @@ final class FileCache implements CacheInterface
         }
 
         if (is_file($path)) {
-            throw new CacheException("Failed to create cache directory \"$path\".");
+            throw new CacheException("Failed to create cache directory, file with the same name exists: \"$path\".");
         }
 
         mkdir($path, recursive: true);
