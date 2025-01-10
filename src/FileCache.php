@@ -12,7 +12,6 @@ use Traversable;
 use function array_keys;
 use function array_map;
 use function closedir;
-use function dirname;
 use function error_get_last;
 use function filemtime;
 use function fileowner;
@@ -91,9 +90,6 @@ final class FileCache implements CacheInterface
         private string $cachePath,
         private int $directoryMode = 0775,
     ) {
-        if (!$this->createDirectoryIfNotExists($cachePath)) {
-            throw new CacheException("Failed to create cache directory \"$cachePath\".");
-        }
     }
 
     public function get(string $key, mixed $default = null): mixed
@@ -123,14 +119,7 @@ final class FileCache implements CacheInterface
             return $this->delete($key);
         }
 
-        $file = $this->getCacheFile($key);
-        $cacheDirectory = dirname($file);
-
-        if (!is_dir($this->cachePath)
-            || $this->directoryLevel > 0 && !$this->createDirectoryIfNotExists($cacheDirectory)
-        ) {
-            throw new CacheException("Failed to create cache directory \"$cacheDirectory\".");
-        }
+        $file = $this->getCacheFile($key, ensureDirectory: true);
 
         // If ownership differs, the touch call will fail, so we try to
         // rebuild the file from scratch by deleting it first
@@ -325,25 +314,27 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Ensures that the directory is created.
+     * Ensures that the directory is existing.
      *
      * @param string $path The path to the directory.
-     *
-     * @return bool Whether the directory was created.
      */
-    private function createDirectoryIfNotExists(string $path): bool
+    private function ensureDirectory(string $path): void
     {
         if (is_dir($path)) {
-            return true;
+            return;
         }
 
-        $result = !is_file($path) && mkdir(directory: $path, recursive: true) && is_dir($path);
-
-        if ($result) {
-            chmod($path, $this->directoryMode);
+        if (is_file($path)) {
+            throw new CacheException("Failed to create cache directory \"$path\".");
         }
 
-        return $result;
+        mkdir($path, recursive: true);
+
+        if (!is_dir($path)) {
+            throw new CacheException("Failed to create cache directory \"$path\".");
+        }
+
+        chmod($path, $this->directoryMode);
     }
 
     /**
@@ -353,8 +344,12 @@ final class FileCache implements CacheInterface
      *
      * @return string The cache file path.
      */
-    private function getCacheFile(string $key): string
+    private function getCacheFile(string $key, bool $ensureDirectory = false): string
     {
+        if ($ensureDirectory) {
+            $this->ensureDirectory($this->cachePath);
+        }
+
         if ($this->directoryLevel < 1) {
             return $this->cachePath . DIRECTORY_SEPARATOR . $key . $this->fileSuffix;
         }
@@ -364,6 +359,7 @@ final class FileCache implements CacheInterface
         for ($i = 0; $i < $this->directoryLevel; ++$i) {
             if (($prefix = substr($key, $i + $i, 2)) !== '') {
                 $base .= DIRECTORY_SEPARATOR . $prefix;
+                $this->ensureDirectory($base);
             }
         }
 

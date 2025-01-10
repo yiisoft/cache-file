@@ -2,6 +2,8 @@
 
 ## 3.1.1 under development
 
+- Enh #88: Don't create cache directory on `FileCache` initialization (@vjik)
+- Bug #88: Set correct permissions for nested directories (@vjik)
 - Bug #85: Clear stat cache in `FileCache::set()` (@samdark)
 
 ## 3.1.0 October 09, 2023
