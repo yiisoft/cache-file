@@ -359,7 +359,9 @@ final class FileCache implements CacheInterface
         for ($i = 0; $i < $this->directoryLevel; ++$i) {
             if (($prefix = substr($key, $i + $i, 2)) !== '') {
                 $base .= DIRECTORY_SEPARATOR . $prefix;
-                $this->ensureDirectory($base);
+                if ($ensureDirectory) {
+                    $this->ensureDirectory($base);
+                }
             }
         }
 
