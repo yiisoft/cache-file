@@ -20,6 +20,7 @@ use function function_exists;
 use function is_dir;
 use function is_file;
 use function iterator_to_array;
+use function mkdir;
 use function opendir;
 use function posix_geteuid;
 use function random_int;

@@ -656,4 +656,13 @@ final class FileCacheTest extends TestCase
         $this->assertTrue($this->cache->set(__FUNCTION__, 'cache2', 2));
         $this->assertSame('cache2', $this->cache->get(__FUNCTION__));
     }
+
+    public function testMkdirConvertingErrorToException(): void
+    {
+        $cache = new FileCache("");
+
+        $this->expectException(CacheException::class);
+        $this->expectExceptionMessage('Failed to create directory "". mkdir(): Invalid path');
+        $cache->set('test', 0);
+    }
 }
