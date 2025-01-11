@@ -449,17 +449,16 @@ final class FileCacheTest extends TestCase
             $this->markTestSkipped('Can not test permissions on Windows');
         }
 
-        $cache = new FileCache($this->tmpDir, 0777);
+        $cache = (new FileCache($this->tmpDir, 0777))->withDirectoryLevel(2);
 
         $this->assertInstanceOf(FileCache::class, $cache);
 
-        $cache->set('a', 1);
-        $this->assertSameExceptObject(1, $cache->get('a'));
+        $cache->set('test', 1);
+        $this->assertSameExceptObject(1, $cache->get('test'));
 
-        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
-        $permissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
-
-        $this->assertEquals('0777', $permissions);
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['test']);
+        $this->assertEquals('0777', substr(sprintf('%o', fileperms(dirname($cacheFile))), -4));
+        $this->assertEquals('0777', substr(sprintf('%o', fileperms(dirname($cacheFile, 2))), -4));
 
         // also check top level cache dir permissions
         $permissions = substr(sprintf('%o', fileperms($this->tmpDir)), -4);
@@ -539,19 +538,11 @@ final class FileCacheTest extends TestCase
         $directory = self::RUNTIME_DIRECTORY . '/cache/fail';
         $cache = new FileCache($directory);
 
-        $this->removeDirectory($directory);
+        mkdir(dirname($directory), recursive: true);
         file_put_contents($directory, 'fail');
 
         $this->expectException(CacheException::class);
         $cache->set('key', 'value');
-    }
-
-    public function testConstructorThrowExceptionForInvalidCacheDirectory(): void
-    {
-        $file = self::RUNTIME_DIRECTORY . '/fail';
-        file_put_contents($file, 'fail');
-        $this->expectException(CacheException::class);
-        new FileCache($file);
     }
 
     public function invalidKeyProvider(): array
