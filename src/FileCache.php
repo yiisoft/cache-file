@@ -25,6 +25,7 @@ use function opendir;
 use function posix_geteuid;
 use function random_int;
 use function readdir;
+use function restore_error_handler;
 use function rmdir;
 use function serialize;
 use function set_error_handler;
