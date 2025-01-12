@@ -27,6 +27,7 @@ use function random_int;
 use function readdir;
 use function rmdir;
 use function serialize;
+use function set_error_handler;
 use function sprintf;
 use function strpbrk;
 use function substr;
