@@ -20,12 +20,16 @@ use function function_exists;
 use function is_dir;
 use function is_file;
 use function iterator_to_array;
+use function mkdir;
 use function opendir;
 use function posix_geteuid;
 use function random_int;
 use function readdir;
+use function restore_error_handler;
 use function rmdir;
 use function serialize;
+use function set_error_handler;
+use function sprintf;
 use function strpbrk;
 use function substr;
 use function unlink;
@@ -328,10 +332,21 @@ final class FileCache implements CacheInterface
             throw new CacheException("Failed to create cache directory, file with the same name exists: \"$path\".");
         }
 
-        mkdir($path, recursive: true);
-
-        if (!is_dir($path)) {
-            throw new CacheException("Failed to create cache directory \"$path\".");
+        set_error_handler(
+            static function (int $errorNumber, string $errorString) use ($path): bool {
+                if (is_dir($path)) {
+                    return true;
+                }
+                throw new CacheException(
+                    sprintf('Failed to create directory "%s". %s', $path, $errorString),
+                    $errorNumber,
+                );
+            }
+        );
+        try {
+            mkdir($path, recursive: true);
+        } finally {
+            restore_error_handler();
         }
 
         chmod($path, $this->directoryMode);
