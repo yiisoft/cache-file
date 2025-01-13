@@ -1,5 +1,9 @@
 # Yii Cache Library - File Handler Change Log
 
+## 3.2.1 under development
+
+- no changes in this release.
+
 ## 3.2.0 January 13, 2025
 
 - Enh #88: Don't create cache directory on `FileCache` initialization (@vjik)
