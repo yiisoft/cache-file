@@ -91,7 +91,7 @@ final class FileCache implements CacheInterface
      * @throws CacheException If failed to create cache directory.
      */
     public function __construct(
-        private string $cachePath,
+        private readonly string $cachePath,
         private int $directoryMode = 0775,
     ) {
     }

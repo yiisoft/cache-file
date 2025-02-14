@@ -3,7 +3,7 @@
 ## 3.2.1 under development
 
 - Chg #91: Change PHP constraint in `composer.json` to `~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0` (@vjik)
-- Сhg #90: Bump minimal required PHP version to 8.1 and minor refactoring (@vjik)
+- Сhg #90, #91: Bump minimal required PHP version to 8.1 and minor refactoring (@vjik)
 
 ## 3.2.0 January 13, 2025
 
