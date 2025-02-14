@@ -106,6 +106,9 @@ final class FileCache implements CacheInterface
         }
 
         flock($filePointer, LOCK_SH);
+        /**
+         * @var string $value We assume that we always cam read content from `$filePointer` resource.
+         */
         $value = stream_get_contents($filePointer);
         flock($filePointer, LOCK_UN);
         fclose($filePointer);
