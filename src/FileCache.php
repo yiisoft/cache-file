@@ -91,7 +91,7 @@ final class FileCache implements CacheInterface
      * @throws CacheException If failed to create cache directory.
      */
     public function __construct(
-        private string $cachePath,
+        private readonly string $cachePath,
         private int $directoryMode = 0775,
     ) {
     }
@@ -106,6 +106,9 @@ final class FileCache implements CacheInterface
         }
 
         flock($filePointer, LOCK_SH);
+        /**
+         * @var string $value We assume that we always can read content from `$filePointer` resource.
+         */
         $value = stream_get_contents($filePointer);
         flock($filePointer, LOCK_UN);
         fclose($filePointer);
