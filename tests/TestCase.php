@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Yiisoft\Cache\File\Tests;
 
 use Psr\SimpleCache\CacheInterface;
-use Psr\SimpleCache\InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
@@ -87,7 +86,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         return $result;
     }
 
-    public function dataProvider(): array
+    public static function dataProvider(): array
     {
         $object = new stdClass();
         $object->test_field = 'test_value';
@@ -121,19 +120,13 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
     /**
      * This function configures given cache to match some expectations
-     *
-     * @throws InvalidArgumentException
-     *
-     * @return CacheInterface
      */
     public function prepare(CacheInterface $cache): CacheInterface
     {
         $cache->clear();
 
-        $data = $this->dataProvider();
-
-        foreach ($data as $datum) {
-            $cache->set($datum[0], $datum[1]);
+        foreach (self::dataProvider() as $data) {
+            $cache->set($data[0], $data[1]);
         }
 
         return $cache;
