@@ -8,12 +8,10 @@ require_once __DIR__ . '/MockHelper.php';
 
 use ArrayIterator;
 use DateInterval;
-use Exception;
 use IteratorAggregate;
 use phpmock\phpunit\PHPMock;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\SimpleCache\InvalidArgumentException;
-use ReflectionException;
 use Yiisoft\Cache\File\CacheException;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Yiisoft\Cache\File\Tests;
 
 use Psr\SimpleCache\CacheInterface;
-use Psr\SimpleCache\InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
