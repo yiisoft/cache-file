@@ -153,7 +153,7 @@ final class FileCacheTest extends TestCase
     public function testGetMultiple(): void
     {
         $data = $this->getDataProviderData();
-        $keys = array_map('\strval', array_keys($data));
+        $keys = array_map(\strval(...), array_keys($data));
         $this->cache->setMultiple($data);
 
         $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
@@ -162,7 +162,7 @@ final class FileCacheTest extends TestCase
     public function testDeleteMultiple(): void
     {
         $data = $this->getDataProviderData();
-        $keys = array_map('\strval', array_keys($data));
+        $keys = array_map(\strval(...), array_keys($data));
         $this->cache->setMultiple($data);
 
         $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
@@ -570,7 +570,6 @@ final class FileCacheTest extends TestCase
 
         $refClass = new \ReflectionClass($this->cache);
         $refMethodGetCacheFile = $refClass->getMethod('getCacheFile');
-        $refMethodGetCacheFile->setAccessible(true);
         $cacheFile = $refMethodGetCacheFile->invoke($this->cache, __FUNCTION__);
 
         // simulate cache expire 10 seconds ago
