@@ -82,8 +82,7 @@ final class FileCache implements CacheInterface
         private ?int $fileMode = null,
         private int $directoryLevel = 1,
         private int $gcProbability = 10,
-    ) {
-    }
+    ) {}
 
     public function get(string $key, mixed $default = null): mixed
     {

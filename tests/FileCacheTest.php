@@ -561,43 +561,11 @@ final class FileCacheTest extends TestCase
         $cache->set('test', 0);
     }
 
-    private function isWindows(): bool
-    {
-        return DIRECTORY_SEPARATOR === '\\';
-    }
-
-    private function assertPathEquals($expected, $actual, string $message = ''): void
-    {
-        $expected = $this->normalizePath($expected);
-        $actual = $this->normalizePath($actual);
-        $this->assertSame($expected, $actual, $message);
-    }
-
-    private function normalizePath(string $path): string
-    {
-        return str_replace('\\', '/', $path);
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        if ($items = glob("{$directory}/*")) {
-            foreach ($items as $item) {
-                is_dir($item) ? $this->removeDirectory($item) : unlink($item);
-            }
-        }
-
-        rmdir($directory);
-    }
-
     public function testSetClearsStatCache(): void
     {
         $this->cache->set(__FUNCTION__, 'cache1', 2);
 
-        $refClass = new \ReflectionClass($this->cache);
+        $refClass = new ReflectionClass($this->cache);
         $refMethodGetCacheFile = $refClass->getMethod('getCacheFile');
         $cacheFile = $refMethodGetCacheFile->invoke($this->cache, __FUNCTION__);
 
@@ -702,7 +670,7 @@ final class FileCacheTest extends TestCase
             fileSuffix: '.cache',
             fileMode: 0644,
             directoryLevel: 2,
-            gcProbability: 0
+            gcProbability: 0,
         );
 
         $this->assertInstanceOf(FileCache::class, $cache);
@@ -722,5 +690,37 @@ final class FileCacheTest extends TestCase
         // Check directory level (2 levels)
         $dirPermissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
         $this->assertEquals('0777', $dirPermissions);
+    }
+
+    private function isWindows(): bool
+    {
+        return DIRECTORY_SEPARATOR === '\\';
+    }
+
+    private function assertPathEquals($expected, $actual, string $message = ''): void
+    {
+        $expected = $this->normalizePath($expected);
+        $actual = $this->normalizePath($actual);
+        $this->assertSame($expected, $actual, $message);
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return str_replace('\\', '/', $path);
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        if ($items = glob("{$directory}/*")) {
+            foreach ($items as $item) {
+                is_dir($item) ? $this->removeDirectory($item) : unlink($item);
+            }
+        }
+
+        rmdir($directory);
     }
 }
