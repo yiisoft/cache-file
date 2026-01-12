@@ -54,37 +54,21 @@ final class FileCache implements CacheInterface
     private const EXPIRATION_EXPIRED = -1;
 
     /**
-     * @var string The cache file suffix. Defaults to '.bin'.
-     */
-    private string $fileSuffix = '.bin';
-
-    /**
-     * @var int|null The permission to be set for newly created cache files.
-     * This value will be used by PHP chmod() function. No umask will be applied.
-     * If not set, the permission will be determined by the current environment.
-     */
-    private ?int $fileMode = null;
-
-    /**
-     * @var int The level of sub-directories to store cache files. Defaults to 1.
-     * If the system has huge number of cache files (e.g. one million), you may use a bigger value
-     * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
-     * is not over burdened with a single directory having too many files.
-     */
-    private int $directoryLevel = 1;
-
-    /**
-     * @var int The probability (parts per million) that garbage collection (GC) should be performed
-     * when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
-     * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
-     */
-    private int $gcProbability = 10;
-
-    /**
      * @param string $cachePath The directory to store cache files.
      * @param int $directoryMode The permission to be set for newly created directories. This value will be used
      * by PHP `chmod()` function. No umask will be applied. Defaults to 0775, meaning the directory is read-writable
      * by owner and group, but read-only for other users.
+     * @param string $fileSuffix The cache file suffix. Defaults to '.bin'.
+     * @param int|null $fileMode The permission to be set for newly created cache files.
+     * This value will be used by PHP chmod() function. No umask will be applied.
+     * If not set, the permission will be determined by the current environment.
+     * @param int $directoryLevel The level of sub-directories to store cache files. Defaults to 1.
+     * If the system has huge number of cache files (e.g. one million), you may use a bigger value
+     * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
+     * is not over burdened with a single directory having too many files.
+     * @param int $gcProbability The probability (parts per million) that garbage collection (GC) should be performed
+     * when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
+     * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
      *
      * @see FileCache::$cachePath
      *
@@ -93,6 +77,10 @@ final class FileCache implements CacheInterface
     public function __construct(
         private readonly string $cachePath,
         private int $directoryMode = 0775,
+        private string $fileSuffix = '.bin',
+        private ?int $fileMode = null,
+        private int $directoryLevel = 1,
+        private int $gcProbability = 10,
     ) {
     }
 
@@ -221,6 +209,8 @@ final class FileCache implements CacheInterface
 
     /**
      * @param string $fileSuffix The cache file suffix. Defaults to '.bin'.
+     *
+     * @deprecated Use `$fileSuffix` in the constructor instead
      */
     public function withFileSuffix(string $fileSuffix): self
     {
@@ -233,6 +223,8 @@ final class FileCache implements CacheInterface
      * @param int $fileMode The permission to be set for newly created cache files. This value will be used
      * by PHP `chmod()` function. No umask will be applied. If not set, the permission will be determined
      * by the current environment.
+     *
+     * @deprecated Use `$fileMode` in the constructor instead
      */
     public function withFileMode(int $fileMode): self
     {
@@ -260,6 +252,8 @@ final class FileCache implements CacheInterface
      * If the system has huge number of cache files (e.g. one million), you may use a bigger value
      * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
      * is not over burdened with a single directory having too many files.
+     *
+     * @deprecated Use `$directoryLevel` in the constructor instead
      */
     public function withDirectoryLevel(int $directoryLevel): self
     {
@@ -272,6 +266,8 @@ final class FileCache implements CacheInterface
      * @param int $gcProbability The probability (parts per million) that garbage collection (GC) should
      * be performed when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
      * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
+     *
+     * @deprecated Use `$gcProbability` in the constructor instead
      */
     public function withGcProbability(int $gcProbability): self
     {
