@@ -20,7 +20,7 @@ declare(strict_types=1);
  */
 require __DIR__ . '/../vendor/autoload.php';
 
-error_reporting(E_ALL);
+error_reporting(\E_ALL);
 ini_set('display_errors', '1');
 
 use Yiisoft\Cache\File\FileCache;
@@ -29,7 +29,7 @@ $cache = (new FileCache('/tmp/yii-cache'))
     ->withDirectoryLevel(2)
     ->withFileMode(0777);
 
-if (!extension_loaded('pcntl')) {
+if (!\extension_loaded('pcntl')) {
     echo "no pcntl extension\n";
     exit(1);
 }

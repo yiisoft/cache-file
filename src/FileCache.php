@@ -38,6 +38,7 @@ use function unserialize;
 use const LOCK_EX;
 use const LOCK_SH;
 use const LOCK_UN;
+use const DIRECTORY_SEPARATOR;
 
 /**
  * `FileCache` implements a cache handler using files.
@@ -104,7 +105,7 @@ final class FileCache implements CacheInterface
         return unserialize($value);
     }
 
-    public function set(string $key, mixed $value, null|int|DateInterval $ttl = null): bool
+    public function set(string $key, mixed $value, int|DateInterval|null $ttl = null): bool
     {
         $this->validateKey($key);
         $this->gc();
@@ -177,7 +178,7 @@ final class FileCache implements CacheInterface
         return $results;
     }
 
-    public function setMultiple(iterable $values, null|int|DateInterval $ttl = null): bool
+    public function setMultiple(iterable $values, int|DateInterval|null $ttl = null): bool
     {
         $values = $this->iterableToArray($values);
         $this->validateKeys(array_map(\strval(...), array_keys($values)));
@@ -279,7 +280,7 @@ final class FileCache implements CacheInterface
     /**
      * Converts TTL to expiration.
      */
-    private function ttlToExpiration(null|int|string|DateInterval $ttl = null): int
+    private function ttlToExpiration(int|string|DateInterval|null $ttl = null): int
     {
         $ttl = $this->normalizeTtl($ttl);
 
@@ -301,7 +302,7 @@ final class FileCache implements CacheInterface
      *
      * @return int|null TTL value as UNIX timestamp or null meaning infinity
      */
-    private function normalizeTtl(null|int|string|DateInterval $ttl = null): ?int
+    private function normalizeTtl(int|string|DateInterval|null $ttl = null): ?int
     {
         if ($ttl === null) {
             return null;
@@ -340,7 +341,7 @@ final class FileCache implements CacheInterface
                     sprintf('Failed to create directory "%s". %s', $path, $errorString),
                     $errorNumber,
                 );
-            }
+            },
         );
         try {
             mkdir($path, recursive: true);

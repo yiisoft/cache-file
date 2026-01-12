@@ -15,6 +15,7 @@ use Psr\SimpleCache\InvalidArgumentException;
 use Yiisoft\Cache\File\CacheException;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
+use ReflectionClass;
 
 use function array_keys;
 use function array_map;
@@ -34,6 +35,8 @@ use function sys_get_temp_dir;
 use function time;
 use function uniqid;
 use function unlink;
+
+use const DIRECTORY_SEPARATOR;
 
 final class FileCacheTest extends TestCase
 {
@@ -168,7 +171,7 @@ final class FileCacheTest extends TestCase
         $this->assertSameExceptObject($data, $this->cache->getMultiple($keys));
 
         $this->cache->deleteMultiple($keys);
-        $emptyData = array_map(static fn () => null, $data);
+        $emptyData = array_map(static fn() => null, $data);
 
         $this->assertSameExceptObject($emptyData, $this->cache->getMultiple($keys));
     }
@@ -258,7 +261,7 @@ final class FileCacheTest extends TestCase
             ],
             'IteratorAggregate' => [
                 ['a' => 1, 'b' => 2,],
-                new class () implements IteratorAggregate {
+                new class implements IteratorAggregate {
                     public function getIterator(): ArrayIterator
                     {
                         return new ArrayIterator(['a' => 1, 'b' => 2,]);
@@ -530,6 +533,32 @@ final class FileCacheTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->cache->has($key);
+    }
+
+    public function testSetClearsStatCache(): void
+    {
+        $this->cache->set(__FUNCTION__, 'cache1', 2);
+
+        $refClass = new ReflectionClass($this->cache);
+        $refMethodGetCacheFile = $refClass->getMethod('getCacheFile');
+        $cacheFile = $refMethodGetCacheFile->invoke($this->cache, __FUNCTION__);
+
+        // simulate cache expire 10 seconds ago
+        touch($cacheFile, time() - 10);
+        clearstatcache();
+
+        $this->assertNull($this->cache->get(__FUNCTION__));
+        $this->assertTrue($this->cache->set(__FUNCTION__, 'cache2', 2));
+        $this->assertSame('cache2', $this->cache->get(__FUNCTION__));
+    }
+
+    public function testMkdirConvertingErrorToException(): void
+    {
+        $cache = new FileCache('');
+
+        $this->expectException(CacheException::class);
+        $this->expectExceptionMessage('Failed to create directory "". mkdir(): Invalid path');
+        $cache->set('test', 0);
     }
 
     private function isWindows(): bool
