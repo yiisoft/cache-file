@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Yiisoft\Cache\File;
 
+use Psr\SimpleCache\CacheException as PsrCacheException;
 use RuntimeException;
 
-final class CacheException extends RuntimeException implements \Psr\SimpleCache\CacheException {}
+final class CacheException extends RuntimeException implements PsrCacheException {}
