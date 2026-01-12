@@ -34,6 +34,7 @@
         "psr/simple-cache": "^2.0 || ^3.0"
     },
     "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.92.5",
         "maglnet/composer-require-checker": "^4.7.1",
         "php-mock/php-mock-phpunit": "^2.10",
         "phpunit/phpunit": "^10.5.45",
