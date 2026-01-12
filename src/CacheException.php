@@ -6,6 +6,4 @@ namespace Yiisoft\Cache\File;
 
 use RuntimeException;
 
-final class CacheException extends RuntimeException implements \Psr\SimpleCache\CacheException
-{
-}
+final class CacheException extends RuntimeException implements \Psr\SimpleCache\CacheException {}

@@ -9,7 +9,7 @@ namespace Yiisoft\Cache\File;
  */
 function time(): int
 {
-    return MockHelper::$time ?? \time();
+    return MockHelper::$time ?? time();
 }
 
 final class MockHelper
