@@ -10,6 +10,8 @@ $finder = (new Finder())->in([
     __DIR__ . '/config',
     __DIR__ . '/src',
     __DIR__ . '/tests',
+])->notPath([
+    'MockHelper.php'
 ]);
 
 return (new Config())
