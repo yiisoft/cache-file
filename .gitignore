@@ -32,3 +32,7 @@ composer.phar
 analysis.txt
 
 /tests/runtime
+
+# PHP CS Fixer
+/.php-cs-fixer.cache
+/.php-cs-fixer.php
