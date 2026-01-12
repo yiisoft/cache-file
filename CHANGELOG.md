@@ -4,6 +4,7 @@
 
 - Chg #91: Change PHP constraint in `composer.json` to `~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0` (@vjik)
 - Сhg #90, #91: Bump minimal required PHP version to 8.1 and minor refactoring (@vjik)
+- Enh #97: Explicitly import classes and constants in "use" section (@mspirkov)
 
 ## 3.2.0 January 13, 2025
 
