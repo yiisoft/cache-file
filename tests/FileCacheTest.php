@@ -682,14 +682,14 @@ final class FileCacheTest extends TestCase
         $this->assertSameExceptObject(123, $cache->get('test'));
 
         $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['test']);
-        
+
         // Check file suffix
         $this->assertEquals('.cache', substr($cacheFile, -6));
-        
+
         // Check file mode
         $filePermissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
         $this->assertEquals('0644', $filePermissions);
-        
+
         // Check directory level (2 levels)
         $dirPermissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
         $this->assertEquals('0777', $dirPermissions);
