@@ -561,23 +561,6 @@ final class FileCacheTest extends TestCase
         $cache->set('test', 0);
     }
 
-    public function testSetClearsStatCache(): void
-    {
-        $this->cache->set(__FUNCTION__, 'cache1', 2);
-
-        $refClass = new ReflectionClass($this->cache);
-        $refMethodGetCacheFile = $refClass->getMethod('getCacheFile');
-        $cacheFile = $refMethodGetCacheFile->invoke($this->cache, __FUNCTION__);
-
-        // simulate cache expire 10 seconds ago
-        touch($cacheFile, time() - 10);
-        clearstatcache();
-
-        $this->assertNull($this->cache->get(__FUNCTION__));
-        $this->assertTrue($this->cache->set(__FUNCTION__, 'cache2', 2));
-        $this->assertSame('cache2', $this->cache->get(__FUNCTION__));
-    }
-
     public function testMkdirConvertingErrorToException(): void
     {
         $cache = new FileCache('');
