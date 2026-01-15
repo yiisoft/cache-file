@@ -18,7 +18,7 @@ This package implements file-based [PSR-16](https://www.php-fig.org/psr/psr-16/)
 
 ## Requirements
 
-- PHP 8.1 or higher.
+- PHP 8.1 - 8.5.
 
 ## Installation
 
