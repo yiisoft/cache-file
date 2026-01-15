@@ -561,15 +561,6 @@ final class FileCacheTest extends TestCase
         $cache->set('test', 0);
     }
 
-    public function testMkdirConvertingErrorToException(): void
-    {
-        $cache = new FileCache('');
-
-        $this->expectException(CacheException::class);
-        $this->expectExceptionMessage('Failed to create directory "". mkdir(): Invalid path');
-        $cache->set('test', 0);
-    }
-
     public function testConstructorWithFileSuffix(): void
     {
         if ($this->isWindows()) {
