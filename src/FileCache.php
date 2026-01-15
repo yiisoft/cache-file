@@ -63,11 +63,11 @@ final class FileCache implements CacheInterface
      * @param int|null $fileMode The permission to be set for newly created cache files.
      * This value will be used by PHP chmod() function. No umask will be applied.
      * If not set, the permission will be determined by the current environment.
-     * @param int $directoryLevel The level of sub-directories to store cache files. Defaults to 1.
+     * @param int $directoryLevel The level of subdirectories to store cache files. Defaults to 1.
      * If the system has huge number of cache files (e.g. one million), you may use a bigger value
-     * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
+     * (usually no bigger than 3). Using subdirectories is mainly to ensure the file system
      * is not over burdened with a single directory having too many files.
-     * @param int $gcProbability The probability (parts per million) that garbage collection (GC) should be performed
+     * @param int $gcProbability The probability (parts per million) that garbage collection (GC) should be performed.
      * when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
      * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
      *
@@ -210,7 +210,7 @@ final class FileCache implements CacheInterface
     /**
      * @param string $fileSuffix The cache file suffix. Defaults to '.bin'.
      *
-     * @deprecated Use `$fileSuffix` in the constructor instead
+     * @deprecated Use `$fileSuffix` in the constructor instead.
      */
     public function withFileSuffix(string $fileSuffix): self
     {
@@ -224,7 +224,7 @@ final class FileCache implements CacheInterface
      * by PHP `chmod()` function. No umask will be applied. If not set, the permission will be determined
      * by the current environment.
      *
-     * @deprecated Use `$fileMode` in the constructor instead
+     * @deprecated Use `$fileMode` in the constructor instead.
      */
     public function withFileMode(int $fileMode): self
     {
@@ -238,7 +238,7 @@ final class FileCache implements CacheInterface
      * by PHP `chmod()` function. No umask will be applied. Defaults to 0775, meaning the directory is read-writable
      * by owner and group, but read-only for other users.
      *
-     * @deprecated Use `$directoryMode` in the constructor instead
+     * @deprecated Use `$directoryMode` in the constructor instead.
      */
     public function withDirectoryMode(int $directoryMode): self
     {
@@ -248,12 +248,12 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * @param int $directoryLevel The level of sub-directories to store cache files. Defaults to 1.
+     * @param int $directoryLevel The level of subdirectories to store cache files. Defaults to 1.
      * If the system has huge number of cache files (e.g. one million), you may use a bigger value
-     * (usually no bigger than 3). Using sub-directories is mainly to ensure the file system
+     * (usually no bigger than 3). Using subdirectories is mainly to ensure the file system
      * is not over burdened with a single directory having too many files.
      *
-     * @deprecated Use `$directoryLevel` in the constructor instead
+     * @deprecated Use `$directoryLevel` in the constructor instead.
      */
     public function withDirectoryLevel(int $directoryLevel): self
     {
@@ -267,7 +267,7 @@ final class FileCache implements CacheInterface
      * be performed when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
      * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
      *
-     * @deprecated Use `$gcProbability` in the constructor instead
+     * @deprecated Use `$gcProbability` in the constructor instead.
      */
     public function withGcProbability(int $gcProbability): self
     {
@@ -299,7 +299,7 @@ final class FileCache implements CacheInterface
      *
      * @param DateInterval|int|string|null $ttl The raw TTL.
      *
-     * @return int|null TTL value as UNIX timestamp or null meaning infinity
+     * @return int|null TTL value as UNIX timestamp or null meaning infinity.
      */
     private function normalizeTtl(int|string|DateInterval|null $ttl = null): ?int
     {
