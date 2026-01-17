@@ -333,7 +333,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = $this->cache->withFileSuffix('.test');
 
-        $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
 
         $cache->set('a', 1);
@@ -352,7 +351,6 @@ final class FileCacheTest extends TestCase
         $cache = new FileCache($this->tmpDir);
         $newCache = $cache->withFileMode(0755);
 
-        $this->assertInstanceOf(FileCache::class, $newCache);
         $this->assertNotSame($cache, $newCache);
 
         $newCache->set('a', 1);
@@ -373,7 +371,6 @@ final class FileCacheTest extends TestCase
         $cache = new FileCache($this->tmpDir);
         $newCache = $cache->withDirectoryMode(0777);
 
-        $this->assertInstanceOf(FileCache::class, $newCache);
         $this->assertNotSame($cache, $newCache);
 
         $newCache->set('a', 1);
@@ -393,7 +390,6 @@ final class FileCacheTest extends TestCase
 
         $cache = (new FileCache($this->tmpDir, 0777))->withDirectoryLevel(2);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
 
         $cache->set('test', 1);
         $this->assertSameExceptObject(1, $cache->get('test'));
@@ -411,7 +407,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = $this->cache->withDirectoryLevel(0);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
 
         $cache->set('a', 1);
@@ -447,7 +442,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = $this->cache->withGcProbability(1_000_000);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
 
         $key = 'gc_probability_test';
@@ -563,13 +557,7 @@ final class FileCacheTest extends TestCase
 
     public function testConstructorWithFileSuffix(): void
     {
-        if ($this->isWindows()) {
-            $this->markTestSkipped('Can not test on Windows');
-        }
-
         $cache = new FileCache($this->tmpDir, fileSuffix: '.test');
-
-        $this->assertInstanceOf(FileCache::class, $cache);
 
         $cache->set('a', 1);
         $this->assertSameExceptObject(1, $cache->get('a'));
@@ -580,13 +568,7 @@ final class FileCacheTest extends TestCase
 
     public function testConstructorWithFileMode(): void
     {
-        if ($this->isWindows()) {
-            $this->markTestSkipped('Can not test permissions on Windows');
-        }
-
         $cache = new FileCache($this->tmpDir, fileMode: 0755);
-
-        $this->assertInstanceOf(FileCache::class, $cache);
 
         $cache->set('a', 1);
         $this->assertSameExceptObject(1, $cache->get('a'));
@@ -601,8 +583,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = new FileCache($this->tmpDir, directoryLevel: 0);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
-
         $cache->set('a', 1);
         $this->assertSameExceptObject(1, $cache->get('a'));
 
@@ -613,8 +593,6 @@ final class FileCacheTest extends TestCase
     public function testConstructorWithGcProbability(): void
     {
         $cache = new FileCache($this->tmpDir, gcProbability: 1_000_000);
-
-        $this->assertInstanceOf(FileCache::class, $cache);
 
         $key = 'gc_probability_test';
         MockHelper::$time = time();
@@ -634,10 +612,6 @@ final class FileCacheTest extends TestCase
 
     public function testConstructorWithAllParameters(): void
     {
-        if ($this->isWindows()) {
-            $this->markTestSkipped('Can not test permissions on Windows');
-        }
-
         $cache = new FileCache(
             cachePath: $this->tmpDir,
             directoryMode: 0777,
@@ -646,8 +620,6 @@ final class FileCacheTest extends TestCase
             directoryLevel: 2,
             gcProbability: 0,
         );
-
-        $this->assertInstanceOf(FileCache::class, $cache);
 
         $cache->set('test', 123);
         $this->assertSameExceptObject(123, $cache->get('test'));
