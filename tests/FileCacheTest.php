@@ -568,6 +568,10 @@ final class FileCacheTest extends TestCase
 
     public function testConstructorWithFileMode(): void
     {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Can not test file mode on Windows');
+        }
+
         $cache = new FileCache($this->tmpDir, fileMode: 0755);
 
         $cache->set('a', 1);
