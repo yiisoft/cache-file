@@ -616,6 +616,8 @@ final class FileCacheTest extends TestCase
 
     public function testConstructorWithAllParameters(): void
     {
+
+
         $cache = new FileCache(
             cachePath: $this->tmpDir,
             directoryMode: 0777,
@@ -633,13 +635,16 @@ final class FileCacheTest extends TestCase
         // Check file suffix
         $this->assertEquals('.cache', substr($cacheFile, -6));
 
-        // Check file mode
-        $filePermissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
-        $this->assertEquals('0644', $filePermissions);
 
-        // Check directory level (2 levels)
-        $dirPermissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
-        $this->assertEquals('0777', $dirPermissions);
+        if (!$this->isWindows()) {
+            // Check file mode
+            $filePermissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
+            $this->assertEquals('0644', $filePermissions);
+
+            // Check directory level (2 levels)
+            $dirPermissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
+            $this->assertEquals('0777', $dirPermissions);
+        }
     }
 
     private function isWindows(): bool
