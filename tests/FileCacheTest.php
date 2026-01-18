@@ -390,7 +390,6 @@ final class FileCacheTest extends TestCase
 
         $cache = (new FileCache($this->tmpDir, 0777))->withDirectoryLevel(2);
 
-
         $cache->set('test', 1);
         $this->assertSameExceptObject(1, $cache->get('test'));
 
@@ -616,8 +615,6 @@ final class FileCacheTest extends TestCase
 
     public function testConstructorWithAllParameters(): void
     {
-
-
         $cache = new FileCache(
             cachePath: $this->tmpDir,
             directoryMode: 0777,
@@ -634,7 +631,6 @@ final class FileCacheTest extends TestCase
 
         // Check file suffix
         $this->assertEquals('.cache', substr($cacheFile, -6));
-
 
         if (!$this->isWindows()) {
             // Check file mode
