@@ -9,6 +9,11 @@ use Yiisoft\Cache\File\FileCache;
 
 return [
     FileCache::class => static fn(Aliases $aliases) => new FileCache(
-        $aliases->get($params['yiisoft/cache-file']['fileCache']['path']),
+        cachePath: $aliases->get($params['yiisoft/cache-file']['fileCache']['path']),
+        directoryMode: $params['yiisoft/cache-file']['fileCache']['directoryMode'],
+        fileSuffix: $params['yiisoft/cache-file']['fileCache']['fileSuffix'],
+        fileMode: $params['yiisoft/cache-file']['fileCache']['fileMode'],
+        directoryLevel: $params['yiisoft/cache-file']['fileCache']['directoryLevel'],
+        gcProbability: $params['yiisoft/cache-file']['fileCache']['gcProbability'],
     ),
 ];

@@ -4,6 +4,7 @@
 
 - Chg #90, #91, #95: Adjust supported PHP versions to be 8.1 — 8.5 (@vjik, @samdark)
 - Enh #97: Explicitly import classes and constants in "use" section (@mspirkov)
+- Chg #93: Deprecate `FileCache::with*()` methods in favor of constructor parameters (@samdark)
 
 ## 3.2.0 January 13, 2025
 

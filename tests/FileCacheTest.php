@@ -333,7 +333,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = $this->cache->withFileSuffix('.test');
 
-        $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
 
         $cache->set('a', 1);
@@ -352,7 +351,6 @@ final class FileCacheTest extends TestCase
         $cache = new FileCache($this->tmpDir);
         $newCache = $cache->withFileMode(0755);
 
-        $this->assertInstanceOf(FileCache::class, $newCache);
         $this->assertNotSame($cache, $newCache);
 
         $newCache->set('a', 1);
@@ -373,7 +371,6 @@ final class FileCacheTest extends TestCase
         $cache = new FileCache($this->tmpDir);
         $newCache = $cache->withDirectoryMode(0777);
 
-        $this->assertInstanceOf(FileCache::class, $newCache);
         $this->assertNotSame($cache, $newCache);
 
         $newCache->set('a', 1);
@@ -393,7 +390,6 @@ final class FileCacheTest extends TestCase
 
         $cache = (new FileCache($this->tmpDir, 0777))->withDirectoryLevel(2);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
 
         $cache->set('test', 1);
         $this->assertSameExceptObject(1, $cache->get('test'));
@@ -411,7 +407,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = $this->cache->withDirectoryLevel(0);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
 
         $cache->set('a', 1);
@@ -447,7 +442,6 @@ final class FileCacheTest extends TestCase
     {
         $cache = $this->cache->withGcProbability(1_000_000);
 
-        $this->assertInstanceOf(FileCache::class, $cache);
         $this->assertNotSame($this->cache, $cache);
 
         $key = 'gc_probability_test';
@@ -559,6 +553,98 @@ final class FileCacheTest extends TestCase
         $this->expectException(CacheException::class);
         $this->expectExceptionMessage('Failed to create directory "". mkdir(): Invalid path');
         $cache->set('test', 0);
+    }
+
+    public function testConstructorWithFileSuffix(): void
+    {
+        $cache = new FileCache($this->tmpDir, fileSuffix: '.test');
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $this->assertEquals('.test', substr($cacheFile, -5));
+    }
+
+    public function testConstructorWithFileMode(): void
+    {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Can not test file mode on Windows');
+        }
+
+        $cache = new FileCache($this->tmpDir, fileMode: 0755);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $permissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
+
+        $this->assertEquals('0755', $permissions);
+    }
+
+    public function testConstructorWithDirectoryLevel(): void
+    {
+        $cache = new FileCache($this->tmpDir, directoryLevel: 0);
+
+        $cache->set('a', 1);
+        $this->assertSameExceptObject(1, $cache->get('a'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['a']);
+        $this->assertPathEquals($this->tmpDir . '/a.bin', $cacheFile);
+    }
+
+    public function testConstructorWithGcProbability(): void
+    {
+        $cache = new FileCache($this->tmpDir, gcProbability: 1_000_000);
+
+        $key = 'gc_probability_test';
+        MockHelper::$time = time();
+
+        $cache->set($key, 1, 1);
+        $this->assertSameExceptObject(1, $cache->get($key));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', [$key]);
+        $this->assertFileExists($cacheFile);
+
+        MockHelper::$time++;
+        MockHelper::$time++;
+
+        $cache->set('b', 2);
+        $this->assertFileDoesNotExist($cacheFile);
+    }
+
+    public function testConstructorWithAllParameters(): void
+    {
+
+
+        $cache = new FileCache(
+            cachePath: $this->tmpDir,
+            directoryMode: 0777,
+            fileSuffix: '.cache',
+            fileMode: 0644,
+            directoryLevel: 2,
+            gcProbability: 0,
+        );
+
+        $cache->set('test', 123);
+        $this->assertSameExceptObject(123, $cache->get('test'));
+
+        $cacheFile = $this->invokeMethod($cache, 'getCacheFile', ['test']);
+
+        // Check file suffix
+        $this->assertEquals('.cache', substr($cacheFile, -6));
+
+
+        if (!$this->isWindows()) {
+            // Check file mode
+            $filePermissions = substr(sprintf('%o', fileperms($cacheFile)), -4);
+            $this->assertEquals('0644', $filePermissions);
+
+            // Check directory level (2 levels)
+            $dirPermissions = substr(sprintf('%o', fileperms(dirname($cacheFile))), -4);
+            $this->assertEquals('0777', $dirPermissions);
+        }
     }
 
     private function isWindows(): bool

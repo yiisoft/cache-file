@@ -37,6 +37,23 @@ the path to the base directory in which the cache files will be stored:
 $cache = new \Yiisoft\Cache\File\FileCache('/path/to/directory');
 ```
 
+### Constructor parameters
+
+You can configure the cache by passing parameters to the constructor:
+
+```php
+$cache = new \Yiisoft\Cache\File\FileCache(
+    cachePath: '/path/to/directory',
+    directoryMode: 0777,        // Permission for new directories (default: 0775)
+    fileSuffix: '.cache',       // Cache file suffix (default: '.bin')
+    fileMode: 0644,             // Permission for new cache files (default: null)
+    directoryLevel: 2,          // Sub-directory levels (default: 1)
+    gcProbability: 100,         // GC probability in parts per million (default: 10)
+);
+```
+
+#### Directory mode
+
 Change the permission to be set for newly created directories:
 
 ```php
@@ -46,35 +63,55 @@ $cache = new \Yiisoft\Cache\File\FileCache('/path/to/directory', 0777); // defau
 This value will be used by PHP `chmod()` function. No umask will be applied. Defaults to 0775,
 meaning the directory is read-writable by an owner and group, but read-only for other users.
 
+#### File suffix
+
 Change the suffix of the cache files:
 
 ```php
-$cache = $cache->withFileSuffix('.txt'); // default is '.bin'
+$cache = new \Yiisoft\Cache\File\FileCache(
+    cachePath: '/path/to/directory',
+    fileSuffix: '.cache', // default is '.bin'
+);
 ```
+
+#### File mode
 
 Change the permission to be set for newly created cache files:
 
 ```php
-$cache = $cache->withFileMode(0644); // default is null
+$cache = new \Yiisoft\Cache\File\FileCache(
+    cachePath: '/path/to/directory',
+    fileMode: 0644, // default is null
+);
 ```
 
 This value will be used by PHP `chmod()` function. No umask will be applied.
 If not set, the permission will be determined by the current environment.
 
+#### Directory level
+
 Change the level of sub-directories to store cache files:
 
 ```php
-$cache = $cache->withDirectoryLevel(3); // default is 1
+$cache = new \Yiisoft\Cache\File\FileCache(
+    cachePath: '/path/to/directory',
+    directoryLevel: 2, // default is 1
+);
 ```
 
 If the system has huge number of cache files (e.g. one million), you may use a bigger
 value (usually no bigger than 3). Using sub-directories is mainly to ensure the file
 system is not over burdened with a single directory having too many files.
 
+#### GC probability
+
 Change the probability of performing garbage collection when storing a piece of data in the cache:
 
 ```php
-$cache = $cache->withGcProbability(1000); // default is 10
+$cache = new \Yiisoft\Cache\File\FileCache(
+    cachePath: '/path/to/directory',
+    gcProbability: 100, // default is 10
+);
 ```
 
 The probability (parts per million) that garbage collection (GC) should be performed when
