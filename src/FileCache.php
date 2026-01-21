@@ -8,6 +8,8 @@ use DateInterval;
 use DateTime;
 use Psr\SimpleCache\CacheInterface;
 use Traversable;
+use Yiisoft\Cache\Serializer\PhpSerializer;
+use Yiisoft\Cache\Serializer\SerializerInterface;
 
 use function array_keys;
 use function array_map;
@@ -27,18 +29,16 @@ use function random_int;
 use function readdir;
 use function restore_error_handler;
 use function rmdir;
-use function serialize;
 use function set_error_handler;
 use function sprintf;
 use function strpbrk;
 use function substr;
 use function unlink;
-use function unserialize;
 
+use const DIRECTORY_SEPARATOR;
 use const LOCK_EX;
 use const LOCK_SH;
 use const LOCK_UN;
-use const DIRECTORY_SEPARATOR;
 
 /**
  * `FileCache` implements a cache handler using files.
@@ -53,6 +53,7 @@ final class FileCache implements CacheInterface
 {
     private const TTL_INFINITY = 31_536_000; // 1 year
     private const EXPIRATION_EXPIRED = -1;
+    private SerializerInterface $serializer;
 
     /**
      * @param string $cachePath The directory to store cache files.
@@ -70,6 +71,7 @@ final class FileCache implements CacheInterface
      * @param int $gcProbability The probability (parts per million) that garbage collection (GC) should be performed.
      * when storing a piece of data in the cache. Defaults to 10, meaning 0.001% chance.
      * This number should be between 0 and 1000000. A value 0 means no GC will be performed at all.
+     * @param SerializerInterface|null $serializer The custom data serializer. Defaults PhpSerializer
      *
      * @see FileCache::$cachePath
      *
@@ -82,7 +84,10 @@ final class FileCache implements CacheInterface
         private ?int $fileMode = null,
         private int $directoryLevel = 1,
         private int $gcProbability = 10,
-    ) {}
+        SerializerInterface|null $serializer = null,
+    ) {
+        $this->serializer = $serializer ?: new PhpSerializer();
+    }
 
     public function get(string $key, mixed $default = null): mixed
     {
@@ -101,7 +106,7 @@ final class FileCache implements CacheInterface
         flock($filePointer, LOCK_UN);
         fclose($filePointer);
 
-        return unserialize($value);
+        return $this->serializer->unserialize($value);
     }
 
     public function set(string $key, mixed $value, int|DateInterval|null $ttl = null): bool
@@ -123,7 +128,7 @@ final class FileCache implements CacheInterface
             @unlink($file);
         }
 
-        if (file_put_contents($file, serialize($value), LOCK_EX) === false) {
+        if (file_put_contents($file, $this->serializer->serialize($value), LOCK_EX) === false) {
             return false;
         }
 
