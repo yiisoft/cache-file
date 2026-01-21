@@ -84,7 +84,7 @@ final class FileCache implements CacheInterface
         private ?int $fileMode = null,
         private int $directoryLevel = 1,
         private int $gcProbability = 10,
-        SerializerInterface|null $serializer = null,
+        ?SerializerInterface $serializer = null,
     ) {
         $this->serializer = $serializer ?: new PhpSerializer();
     }
