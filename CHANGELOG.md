@@ -6,20 +6,20 @@
 - Enh #97: Explicitly import classes and constants in "use" section (@mspirkov)
 - Chg #93: Deprecate `FileCache::with*()` methods in favor of constructor parameters (@samdark)
 - Enh #101: Remove unnecessary files from Composer package (@mspirkov)
-- Bug #110: Publish `FileCache::set()` writes atomically to prevent partial reads and gaps during replacement (@samdark)
-- Bug #110: Coordinate Windows readers with publication and reuse shared cache locks without requiring ownership (@samdark)
-- Chg #110: Store expiry inside atomically published cache files. Clear the cache on upgrade or rollback;
+- Bug #110: Replace cache files atomically in `FileCache::set()` to prevent partial reads and gaps during replacement (@samdark)
+- Bug #110: Coordinate Windows reads with file replacement and reuse cache locks owned by other users (@samdark)
+- Chg #110: Store expiry inside cache files. Clear the cache on upgrade or rollback;
   see [UPGRADE.md](UPGRADE.md) for deployment instructions (@samdark)
-- Bug #110: Handle incomplete writes and publication failures in `FileCache::set()`, and suppress write warnings (@samdark)
+- Bug #110: Handle incomplete writes and file replacement failures in `FileCache::set()`, and suppress write warnings (@samdark)
 - Bug #110: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
-- Bug #110: Coordinate publication with garbage collection to preserve fresh replacements and skip unreadable entries (@samdark)
+- Bug #110: Coordinate file replacement with garbage collection to keep fresh values and skip unreadable entries (@samdark)
 - Bug #110: Avoid exceptions during garbage collection and `FileCache::clear()` when another process has already
   removed a file (@samdark)
 - Chg #110: Retain directories, active temporary files and the internal lock file during garbage collection and
   `FileCache::clear()` to avoid races with concurrent writers (@samdark)
 - Bug #110: Remove cache entries with dot-prefixed keys during garbage collection and `FileCache::clear()`, including
-  new-format entries with an empty file suffix, while preserving unrelated hidden directories (@samdark)
-- Bug #110: Treat truncated new-format entries as cache misses in `FileCache::get()` and `FileCache::has()` (@samdark)
+  entries in the new format with an empty file suffix, while preserving unrelated hidden directories (@samdark)
+- Bug #110: Treat truncated entries in the new format as cache misses in `FileCache::get()` and `FileCache::has()` (@samdark)
 
 ## 3.2.0 January 13, 2025
 

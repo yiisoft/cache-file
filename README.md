@@ -160,11 +160,13 @@ This package can be used as a cache handler for the [Yii Caching Library](https:
 
 ## Cache file compatibility
 
-Writes publish the expiry and serialized value together by atomically replacing the cache file.
-Existing files with expiry stored in their modification time remain readable; subsequent writes use the new format.
-Older package versions cannot read the new files. The default cache path remains `@runtime/cache`.
-Stop all cache users and clear the cache when upgrading or rolling back. For rolling deployments,
-configure separate cache directories for old and new versions.
+New cache files store the expiry time and serialized value together. Each write replaces the complete file,
+so readers cannot see a partially written value. The new version can read old files, but older versions cannot
+read the new format. The package configuration still uses `@runtime/cache` by default.
+
+To reuse a cache directory during an upgrade or rollback, stop all processes that use it and remove its cached contents.
+During a rolling deployment, old and new versions run at the same time. Give each version a separate directory
+because old processes cannot read files written by new processes.
 
 See the [upgrade guide](UPGRADE.md) for deployment, rollback, and cleanup instructions.
 
@@ -178,7 +180,7 @@ You may also check out other [Yii Community Resources](https://www.yiiframework.
 ## Benchmarks
 
 Run `composer benchmark` after installing development dependencies. See the
-[benchmark guide](benchmarks/README.md) for scenarios, filesystem selection, and comparing changes.
+[benchmark guide](benchmarks/README.md) for the available scenarios and instructions for comparing versions.
 
 ## License
 

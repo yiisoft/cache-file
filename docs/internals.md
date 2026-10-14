@@ -2,43 +2,57 @@
 
 ## Cache files
 
-New entries contain a header followed by the PHP-serialized value:
+New entries contain a header followed by the serialized PHP value:
 
 ```text
-YFC1 <expiration timestamp> <serialized byte length>\n
+YFC1 <expiry timestamp> <serialized byte length>\n
 <serialized value>
 ```
 
-The header ends with a single newline. `get()` opens the file once and reads both expiry and value from that
-handle, so a concurrent replacement cannot mix metadata from one entry with another entry's value.
-`has()` and garbage collection read the expiry from the header. `has()` rejects truncated payloads by checking up to
-4 KiB of payload, usually already buffered during the header read, or checking the opened file size for
-larger values. It never deserializes the value. New entries do not use modification times
-for expiration. Legacy files without a header are read using their modification time.
+The header ends with one newline. `get()` reads the expiry time and value from the same open file.
+If another process replaces that file, the reader still uses matching expiry data and value bytes.
+Old files have no header; their modification time provides the expiry time.
 
-`set()` writes the complete record to a short random temporary filename in the same directory, checks the
-byte count, applies the configured permissions, and renames it into place. Header and payload are written
-as separate chunks to avoid allocating a second full copy of the serialized value. Published files are not modified
-in place. This provides atomic visibility, not durability against power loss.
+`has()` checks expiry and payload length without deserializing the value. For payloads up to 4 KiB,
+it reads the payload, which is usually already in the stream buffer. For larger payloads, it checks
+the size of the open file. Both `get()` and `has()` reject incomplete payloads in the new format.
 
-On most platforms, readers take no lock and publication holds a shared lock on the cache root’s `@gc.lock` file.
-On Windows, readers hold a shared lock while the cache file is open, and publication takes an exclusive lock.
-This lets readers finish before Windows replaces the file. External programs holding files open can still block
-replacement; `set()` then returns `false` and preserves the old value.
+### Writing and locking
 
-Before removing an expired entry,
-garbage collection takes an exclusive lock and rechecks its expiry, so it cannot delete a freshly published
-replacement. Busy publishers cause GC to skip deletion. Unreadable entries and entries with unrecognizable expiry
-are left alone. Existing lock files are opened read-only; configured permissions are applied only when creating them,
-so workers sharing a cache do not need to own the lock file.
+`set()` writes a complete record to a temporary file in the same directory. It checks the byte count,
+applies the configured permissions, and renames the file into place. A short random filename keeps
+temporary names independent of key length. Writing the header and payload as separate chunks avoids
+a second full copy of the serialized value in memory.
 
-Garbage collection and `clear()` preserve the lock file, directories and active temporary files; stale
-temporary files are eligible for cleanup after one hour. Remove retained directories and the lock file only after stopping
-all processes using the cache. Removing the lock file during use breaks publication/GC coordination.
-Cache reads can still miss when entries are concurrently deleted or collected.
+Readers see a complete old or new file. This is atomic replacement; it does not guarantee that data
+survives a power failure.
 
-Use a separate cache directory when old and new package versions run simultaneously: old readers do not
-understand the header, and legacy in-place writers do not follow the atomic publication protocol.
+On platforms other than Windows, reads take no lock. File replacement holds a shared lock on
+`@gc.lock` in the cache root directory. On Windows, reads hold a shared lock while the cache file is
+open, and replacement requires an exclusive lock. This makes replacement wait for cache readers.
+If an external program keeps the file open, replacement can still fail. `set()` then returns `false`
+and keeps the old value.
+
+Existing lock files are opened read-only. Permissions are set only when a lock file is created,
+so other workers do not need to own it or have write access to it.
+
+### Cleanup
+
+Before deleting an expired entry, garbage collection (GC) takes an exclusive lock on `@gc.lock`
+and checks expiry again. This prevents deletion of a value replaced since the first check.
+If the exclusive lock is unavailable, GC skips that deletion. GC also skips entries it cannot read
+or whose expiry it cannot determine.
+
+GC and `clear()` keep directories and the lock file. They keep temporary files created within the
+last hour and can remove older temporary files. Remove retained directories and the lock file only
+after all processes that use the cache have stopped. Deleting the lock file during use breaks the
+coordination between file replacement and GC.
+
+A cache read can still miss if another process deletes the entry or GC removes it after expiry.
+
+Old and new package versions must use separate directories when they run at the same time.
+Old versions cannot read the new header and do not follow the new locking rules.
+See the [upgrade guide](../UPGRADE.md).
 
 ## Unit testing
 

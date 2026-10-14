@@ -2,64 +2,68 @@
 
 ## Upgrading to 3.2.1 (under development)
 
-Cache writes now atomically publish a file containing both the expiry and the serialized value.
-Previously, expiry was stored in the file's modification time.
+New cache files store the expiry time with the serialized value. Older versions store expiry in the file's
+modification time. The new version can read old files, but older versions cannot read the new format.
+Old and new versions must use separate cache directories if they run at the same time.
 
-Public method signatures and constructor defaults are unchanged. `setMultiple()` now correctly returns
-`false` if any write fails, while still attempting the remaining entries. The new implementation can read existing cache files,
-but older package versions cannot read the new format. Old and new processes must not share a cache directory.
+Public method signatures and constructor defaults are unchanged. `setMultiple()` now returns `false`
+if any write fails and still attempts the remaining writes.
 
-The default cache path remains `@runtime/cache`. Clear the cache as part of the upgrade procedure below.
+The package configuration still uses `@runtime/cache` by default. To reuse this directory, clear its cached
+contents while all processes that use it are stopped.
 
 ### Upgrade with all processes stopped
 
-1. Stop every process using the cache, including web requests, queue workers, and scheduled jobs.
-2. Remove the cached contents of the cache directory while those processes are stopped. Preserve or recreate
-   the directory with the permissions required by the application.
-3. Upgrade the package in every application instance that shares the cache directory.
-4. Restart the processes with the new version. Expect cache misses until entries are rebuilt.
+1. Stop all processes that use the cache, including web requests, queue workers, and scheduled jobs.
+2. Remove the cached contents. Keep or recreate the directory with the permissions the application needs.
+3. Upgrade the package in every application instance that shares the directory.
+4. Restart the processes. Expect cache misses until the application creates new entries.
 
-Do not clear the cache while old and new versions are running against the same directory. Cleaning it once
-cannot make mixed-version access safe: the new version will immediately start writing the new format again.
+Clearing the cache while both versions use it is not sufficient: the next write from the new version
+creates a file that the old version cannot read.
 
 ### Rolling upgrade
 
-1. Configure the new version to use a separate, empty cache directory. For example, if the old version uses
-   `/var/cache/my-app/file-cache`, use `/var/cache/my-app/file-cache-v2` for the new version:
+A rolling upgrade runs old and new application instances at the same time. Separate cache directories
+prevent old instances from reading files written in the new format.
+
+1. Configure the new version to use a separate, empty directory. For example, if the old version uses
+   `/var/cache/my-app/file-cache`, configure the new version as follows:
 
    ```php
    $cache = new \Yiisoft\Cache\File\FileCache('/var/cache/my-app/file-cache-v2');
    ```
 
-2. Deploy the new version and restart its workers with that configuration. Allow for cache misses
-   while the new directory fills, or warm it using the new version before directing traffic to it.
-3. Retire all old processes, including background workers and scheduled jobs.
-4. Remove the old cache directory only after no process uses it.
+2. Deploy the new version and restart its workers with this configuration. Expect cache misses, or
+   populate the new cache before sending requests to the new instances.
+3. Stop all old instances, including background workers and scheduled jobs.
+4. Remove the old cache directory after all processes have stopped using it.
 
-Use directories that are not nested inside each other: `clear()` and garbage collection traverse
-subdirectories. Changing only key prefixes or the file suffix does not isolate the two versions.
+Do not place either cache directory inside the other. `clear()` and garbage collection traverse
+subdirectories. Different key prefixes or file suffixes do not provide this separation.
 
-The caches are independent during the overlap. If your application requires invalidation on data changes,
-propagate those invalidations to both caches.
+If application data changes while both versions run, invalidate affected entries in both caches.
 
 ### Rollback
 
-Configure the older version to use a fresh, empty cache directory. Do not point it at files written by
-the new version. If both versions run during the rollback, keep their cache directories separate.
+Give the older version a separate, empty directory. It cannot read files written by the new version.
+If both versions run during rollback, keep their directories separate.
 
-To reuse the same directory, first stop every process using it, remove its cached contents, deploy the
-older version, and then restart the processes. Expect cache misses until entries are rebuilt.
+To reuse the same directory, stop all processes that use it, remove its cached contents, deploy the
+older version, and restart the processes. Expect cache misses until the application creates new entries.
 
-### Expiry and cleanup integrations
+### Expiry and cleanup scripts
 
-Modification times no longer indicate expiry for new entries. Update any scripts that expire entries
-with `touch()` or identify expired entries by modification time. Use the cache API to delete entries
-or change their TTL, and use the package's garbage collection for expiry cleanup.
+File modification times no longer control expiry for new entries. Update scripts that use `touch()`
+to change expiry or use modification times to find expired entries. Use `delete()` to remove an entry
+or `set()` with a TTL to replace its value and expiry. Garbage collection removes expired entries.
 
-`clear()` and garbage collection retain empty directories and the internal `@gc.lock` file for concurrency
-safety. Remove these only while all processes using the cache are stopped. Do not delete or replace
-`@gc.lock` in an online cleanup script.
+`clear()` and garbage collection keep empty directories and the internal `@gc.lock` file. Other processes
+may still use them. Remove them only after all processes that use the cache have stopped.
+Do not delete or replace `@gc.lock` while the cache is in use.
 
-On Windows, reads use a shared lock and publication waits until cache readers close their files.
-An external program holding a cache file open can still prevent replacement. In that case, `set()`
+### Windows
+
+On Windows, reads hold a shared lock. File replacement waits until cache readers close their files.
+If an external program holds a cache file open, replacement can still fail. In that case, `set()`
 returns `false` and keeps the previous value. Other platforms do not lock reads.
