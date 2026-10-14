@@ -6,6 +6,7 @@ namespace Yiisoft\Cache\File\Tests;
 
 use phpmock\phpunit\PHPMock;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use Yiisoft\Cache\File\FileCache;
 
 use function basename;
@@ -96,6 +97,7 @@ final class RaceConditionTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresOperatingSystem('^(?!WIN)')]
     public function testItemIsAvailableWhileAnotherProcessOverwritesIt(): void
     {
         $cache = new FileCache(self::CACHE_DIRECTORY);

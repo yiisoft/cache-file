@@ -307,6 +307,68 @@ final class ReviewRegressionTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    public function testConcurrentLockCreationIsRetried(): void
+    {
+        $created = false;
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fopen')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, string $mode) use (&$created) {
+                if ($mode === 'x+b') {
+                    // Another worker won the race to create the lock.
+                    touch($path);
+                    $created = true;
+                    return false;
+                }
+                return fopen($path, $mode);
+            });
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $this->assertTrue($cache->set('key', 'value'));
+        $this->assertTrue($created);
+        $this->assertSame('value', $cache->get('key'));
+    }
+
+    #[RunInSeparateProcess]
+    public function testUnavailableLockPreservesExistingValue(): void
+    {
+        $blocked = false;
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fopen')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, string $mode) use (&$blocked) {
+                return $blocked && str_ends_with($path, '@gc.lock') ? false : fopen($path, $mode);
+            });
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $this->assertTrue($cache->set('key', 'old'));
+        $blocked = true;
+        $this->assertFalse($cache->set('key', 'new'));
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->assertSame('miss', $cache->get('key', 'miss'));
+            $this->assertFalse($cache->has('key'));
+            $this->assertFalse($this->invokeMethod($cache, 'isExpired', [
+                $this->invokeMethod($cache, 'getCacheFile', ['key']),
+            ]));
+            $this->assertFalse($this->invokeMethod($cache, 'hasCacheHeader', [
+                $this->invokeMethod($cache, 'getCacheFile', ['key']),
+            ]));
+        }
+        $blocked = false;
+        $this->assertSame('old', $cache->get('key'));
+    }
+
+    #[RunInSeparateProcess]
+    public function testFailedReadLockClosesItsHandle(): void
+    {
+        $stream = null;
+        $this->getFunctionMock('Yiisoft\Cache\File', 'flock')->expects($this->once())
+            ->willReturnCallback(static function ($handle, int $operation) use (&$stream): bool {
+                $stream = $handle;
+                return false;
+            });
+        mkdir(self::DIRECTORY, recursive: true);
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $this->assertFalse($this->invokeMethod($cache, 'lockForRead'));
+        $this->assertNotNull($stream);
+        $this->assertFalse(is_resource($stream));
+    }
+
+    #[RunInSeparateProcess]
     #[DataProvider('concurrentReadOperations')]
     public function testPublicationDuringRead(string $operation): void
     {
