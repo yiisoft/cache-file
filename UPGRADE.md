@@ -59,3 +59,7 @@ or change their TTL, and use the package's garbage collection for expiry cleanup
 `clear()` and garbage collection retain empty directories and the internal `@gc.lock` file for concurrency
 safety. Remove these only while all processes using the cache are stopped. Do not delete or replace
 `@gc.lock` in an online cleanup script.
+
+On Windows, reads use a shared lock and publication waits until cache readers close their files.
+An external program holding a cache file open can still prevent replacement. In that case, `set()`
+returns `false` and keeps the previous value. Other platforms do not lock reads.

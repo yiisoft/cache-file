@@ -39,6 +39,7 @@ use const DIRECTORY_SEPARATOR;
 use const LOCK_EX;
 use const LOCK_NB;
 use const LOCK_SH;
+use const PHP_OS_FAMILY;
 
 /**
  * `FileCache` implements a cache handler using files.
@@ -95,10 +96,15 @@ final class FileCache implements CacheInterface
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
 
-        if (($handle = @fopen($file, 'rb')) === false) {
+        $handle = false;
+        $lock = null;
+        if (PHP_OS_FAMILY === 'Windows' && ($lock = $this->lockForRead()) === false) {
             return $default;
         }
         try {
+            if (($handle = @fopen($file, 'rb')) === false) {
+                return $default;
+            }
             $metadata = $this->readMetadata($handle);
             if ($metadata === null || $metadata['expiration'] <= time()) {
                 return $default;
@@ -108,7 +114,12 @@ final class FileCache implements CacheInterface
                 return $default;
             }
         } finally {
-            fclose($handle);
+            if ($handle !== false) {
+                fclose($handle);
+            }
+            if ($lock !== null && $lock !== false) {
+                fclose($lock);
+            }
         }
         return unserialize($value);
     }
@@ -152,8 +163,10 @@ final class FileCache implements CacheInterface
                 return false;
             }
             try {
-                // Writers may publish concurrently, but not while GC checks and removes an entry.
-                $published = flock($lock, LOCK_SH) && @rename($temporaryFile, $file);
+                // Windows cannot replace a file while a reader has it open.
+                // Elsewhere, writers may publish concurrently, except during GC.
+                $published = flock($lock, PHP_OS_FAMILY === 'Windows' ? LOCK_EX : LOCK_SH)
+                    && @rename($temporaryFile, $file);
             } finally {
                 fclose($lock);
             }
@@ -409,7 +422,7 @@ final class FileCache implements CacheInterface
      * @param bool $expiredOnly Whether to only remove expired cache files.
      * If false, all cache files under `$path` will be removed.
      */
-    private function removeCacheFiles(string $path, bool $expiredOnly): void
+    private function removeCacheFiles(string $path, bool $expiredOnly, int $depth = 0): void
     {
         if (($handle = @opendir($path)) === false) {
             return;
@@ -424,7 +437,10 @@ final class FileCache implements CacheInterface
                 $fullPath = $path . DIRECTORY_SEPARATOR . $file;
 
                 if (is_dir($fullPath)) {
-                    $this->removeCacheFiles($fullPath, $expiredOnly);
+                    // Hidden directories can only be cache shards at the configured depth.
+                    if ($file[0] !== '.' || (strlen($file) === 2 && $depth < $this->directoryLevel)) {
+                        $this->removeCacheFiles($fullPath, $expiredOnly, $depth + 1);
+                    }
                     continue;
                 }
 
@@ -460,24 +476,52 @@ final class FileCache implements CacheInterface
     private function openGcLock()
     {
         $file = $this->cachePath . DIRECTORY_SEPARATOR . self::GC_LOCK_FILE;
-        $lock = @fopen($file, 'c+b');
-        if ($lock !== false && $this->fileMode !== null && !@chmod($file, $this->fileMode | 0600)) {
+        // Existing locks need only read access, even for an exclusive flock().
+        if (($lock = @fopen($file, 'rb')) !== false) {
+            return $lock;
+        }
+        if (($lock = @fopen($file, 'x+b')) === false) {
+            // Another process may have created it since our first open.
+            return @fopen($file, 'rb');
+        }
+        if ($this->fileMode !== null && !@chmod($file, $this->fileMode | 0600)) {
             fclose($lock);
             return false;
         }
         return $lock;
     }
 
-    private function isExpired(string $file): bool
+    /** @return resource|false */
+    private function lockForRead()
     {
-        if (($handle = @fopen($file, 'rb')) === false) {
+        $lock = $this->openGcLock();
+        if ($lock !== false && !flock($lock, LOCK_SH)) {
+            fclose($lock);
+            return false;
+        }
+        return $lock;
+    }
+
+    private function isExpired(string $file, bool $locked = false): bool
+    {
+        $handle = false;
+        $lock = null;
+        if (PHP_OS_FAMILY === 'Windows' && !$locked && ($lock = $this->lockForRead()) === false) {
             return false;
         }
         try {
+            if (($handle = @fopen($file, 'rb')) === false) {
+                return false;
+            }
             $metadata = $this->readMetadata($handle);
             return $metadata !== null && $metadata['expiration'] <= time();
         } finally {
-            fclose($handle);
+            if ($handle !== false) {
+                fclose($handle);
+            }
+            if ($lock !== null && $lock !== false) {
+                fclose($lock);
+            }
         }
     }
 
@@ -488,7 +532,7 @@ final class FileCache implements CacheInterface
         }
         try {
             // Skip a busy publisher. Recheck under the lock: it may have refreshed this key.
-            if (flock($lock, LOCK_EX | LOCK_NB) && $this->isExpired($file) && !$this->removeFile($file)) {
+            if (flock($lock, LOCK_EX | LOCK_NB) && $this->isExpired($file, locked: true) && !$this->removeFile($file)) {
                 $errorMessage = error_get_last()['message'] ?? '';
                 throw new CacheException("Unable to remove file '{$file}': {$errorMessage}");
             }
@@ -499,13 +543,23 @@ final class FileCache implements CacheInterface
 
     private function hasCacheHeader(string $file): bool
     {
-        if (($handle = @fopen($file, 'rb')) === false) {
+        $handle = false;
+        $lock = null;
+        if (PHP_OS_FAMILY === 'Windows' && ($lock = $this->lockForRead()) === false) {
             return false;
         }
         try {
+            if (($handle = @fopen($file, 'rb')) === false) {
+                return false;
+            }
             return fread($handle, 5) === 'YFC1 ';
         } finally {
-            fclose($handle);
+            if ($handle !== false) {
+                fclose($handle);
+            }
+            if ($lock !== null && $lock !== false) {
+                fclose($lock);
+            }
         }
     }
 
@@ -568,10 +622,15 @@ final class FileCache implements CacheInterface
 
     private function existsAndNotExpired(string $file): bool
     {
-        if (($handle = @fopen($file, 'rb')) === false) {
+        $handle = false;
+        $lock = null;
+        if (PHP_OS_FAMILY === 'Windows' && ($lock = $this->lockForRead()) === false) {
             return false;
         }
         try {
+            if (($handle = @fopen($file, 'rb')) === false) {
+                return false;
+            }
             $metadata = $this->readMetadata($handle);
             if ($metadata === null || $metadata['expiration'] <= time()) {
                 return false;
@@ -586,7 +645,12 @@ final class FileCache implements CacheInterface
             $offset = ftell($handle);
             return $stat !== false && $offset !== false && $stat['size'] - $offset >= $metadata['length'];
         } finally {
-            fclose($handle);
+            if ($handle !== false) {
+                fclose($handle);
+            }
+            if ($lock !== null && $lock !== false) {
+                fclose($lock);
+            }
         }
     }
 

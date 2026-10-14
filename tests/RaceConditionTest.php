@@ -16,6 +16,8 @@ use function is_file;
 use function time;
 use function unlink;
 
+use const DIRECTORY_SEPARATOR;
+
 /**
  * Simulates another process interfering with the cache in the middle of an operation.
  *
@@ -90,7 +92,7 @@ final class RaceConditionTest extends TestCase
         $this->assertTrue($raced, 'The race was not simulated.');
         $this->assertFalse($result);
         $this->assertSame('old', $cache->get('key'));
-        $this->assertSame([$file], glob(dirname($file) . '/*'));
+        $this->assertSame([$file], glob(dirname($file) . DIRECTORY_SEPARATOR . '*'));
     }
 
     #[RunInSeparateProcess]

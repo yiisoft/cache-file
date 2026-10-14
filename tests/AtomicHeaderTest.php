@@ -6,6 +6,7 @@ namespace Yiisoft\Cache\File\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use Yiisoft\Cache\File\FileCache;
 use Exception;
 use phpmock\phpunit\PHPMock;
@@ -13,6 +14,8 @@ use Yiisoft\Cache\File\MockHelper;
 
 use function dirname;
 use function is_array;
+
+use const DIRECTORY_SEPARATOR;
 
 require_once __DIR__ . '/MockHelper.php';
 
@@ -108,10 +111,11 @@ final class AtomicHeaderTest extends TestCase
         $this->assertFalse($cache->set('key', 'new'));
         $this->assertSame('old', $cache->get('key'));
         $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
-        $this->assertSame([$file], glob(dirname($file) . '/*'));
+        $this->assertSame([$file], glob(dirname($file) . DIRECTORY_SEPARATOR . '*'));
     }
 
     #[RunInSeparateProcess]
+    #[RequiresOperatingSystem('^(?!WIN)')]
     public function testOpenedReaderKeepsMatchingHeaderAndPayloadAcrossReplacement(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);

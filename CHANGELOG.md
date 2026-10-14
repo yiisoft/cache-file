@@ -7,6 +7,7 @@
 - Chg #93: Deprecate `FileCache::with*()` methods in favor of constructor parameters (@samdark)
 - Enh #101: Remove unnecessary files from Composer package (@mspirkov)
 - Bug #110: Publish `FileCache::set()` writes atomically to prevent partial reads and gaps during replacement (@samdark)
+- Bug #110: Coordinate Windows readers with publication and reuse shared cache locks without requiring ownership (@samdark)
 - Chg #110: Store expiry inside atomically published cache files. Clear the cache on upgrade or rollback;
   see [UPGRADE.md](UPGRADE.md) for deployment instructions (@samdark)
 - Bug #110: Handle incomplete writes and publication failures in `FileCache::set()`, and suppress write warnings (@samdark)
@@ -17,9 +18,8 @@
 - Chg #110: Retain directories, active temporary files and the internal lock file during garbage collection and
   `FileCache::clear()` to avoid races with concurrent writers (@samdark)
 - Bug #110: Remove cache entries with dot-prefixed keys during garbage collection and `FileCache::clear()`, including
-  new-format entries with an empty file suffix (@samdark)
+  new-format entries with an empty file suffix, while preserving unrelated hidden directories (@samdark)
 - Bug #110: Treat truncated new-format entries as cache misses in `FileCache::get()` and `FileCache::has()` (@samdark)
-- Enh #110: Add PHPBench benchmarks for cache operations, mixed read/write workloads and garbage collection (@samdark)
 
 ## 3.2.0 January 13, 2025
 

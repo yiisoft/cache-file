@@ -8,13 +8,20 @@ use ErrorException;
 use phpmock\phpunit\PHPMock;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystemFamily;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
 use RuntimeException;
 
 use function is_array;
 
+use function is_resource;
+
+use const PHP_OS_FAMILY;
 use const E_ALL;
+use const PHP_BINARY;
 
 require_once __DIR__ . '/MockHelper.php';
 
@@ -31,6 +38,7 @@ final class ReviewRegressionTest extends TestCase
     }
 
     #[RunInSeparateProcess]
+    #[RequiresOperatingSystem('^(?!WIN)')]
     public function testGcKeepsEntryRefreshedAfterExpiryInspection(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
@@ -53,10 +61,8 @@ final class ReviewRegressionTest extends TestCase
         $this->assertSame('fresh', $cache->get('key'));
     }
 
-    /**
-     * @requires extension pcntl
-     * @requires OSFAMILY Linux
-     */
+    #[RequiresPhpExtension('pcntl')]
+    #[RequiresOperatingSystemFamily('Linux')]
     #[RunInSeparateProcess]
     public function testPublisherCannotReplaceEntryBetweenGcCheckAndUnlink(): void
     {
@@ -217,13 +223,21 @@ final class ReviewRegressionTest extends TestCase
         $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
         $reader = fopen($file, 'rb');
         try {
-            $this->assertTrue($cache->set('key', 'new'));
-            $this->assertSame('new', $cache->get('key'));
+            if (PHP_OS_FAMILY === 'Windows') {
+                // An external handle does not participate in the cache's read locks.
+                $this->assertFalse($cache->set('key', 'new'));
+                $this->assertSame('old', $cache->get('key'));
+            } else {
+                $this->assertTrue($cache->set('key', 'new'));
+                $this->assertSame('new', $cache->get('key'));
+            }
             fgets($reader);
             $this->assertSame(serialize('old'), stream_get_contents($reader));
         } finally {
             fclose($reader);
         }
+        $this->assertTrue($cache->set('key', 'new'));
+        $this->assertSame('new', $cache->get('key'));
     }
 
     public function testClearAndGcRetainThePublicationLock(): void
@@ -239,5 +253,132 @@ final class ReviewRegressionTest extends TestCase
         $after = stat($file);
         $this->assertSame($before['ino'], $after['ino']);
         $this->assertSame($before['dev'], $after['dev']);
+    }
+
+    #[DataProvider('directoryLevels')]
+    public function testCleanupPreservesUnrelatedHiddenDirectories(int $level): void
+    {
+        $cache = new FileCache(self::DIRECTORY, directoryLevel: $level, gcProbability: 0);
+        $paths = [self::DIRECTORY . '/.git/objects', self::DIRECTORY . '/ab/.config'];
+        $paths[] = self::DIRECTORY . str_repeat('/ab', $level) . '/.x';
+        foreach ($paths as $path) {
+            mkdir($path, recursive: true);
+            file_put_contents($path . '/keep', 'unrelated');
+            touch($path . '/keep', time() - 3600);
+        }
+        $this->assertTrue($cache->set('.foo', 'cached'));
+        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+        $this->assertTrue($cache->clear());
+        $this->assertNull($cache->get('.foo'));
+        foreach ($paths as $path) {
+            $this->assertSame('unrelated', file_get_contents($path . '/keep'));
+        }
+    }
+
+    #[RunInSeparateProcess]
+    public function testExistingReadOnlyLockDoesNotRequireOwnership(): void
+    {
+        mkdir(self::DIRECTORY, recursive: true);
+        $lock = self::DIRECTORY . '/@gc.lock';
+        touch($lock);
+        chmod($lock, 0444);
+        $this->getFunctionMock('Yiisoft\Cache\File', 'chmod')->expects($this->atLeastOnce())
+            ->willReturnCallback(function (string $path, int $mode) use ($lock): bool {
+                $this->assertNotSame(str_replace('\\', '/', $lock), str_replace('\\', '/', $path));
+                return chmod($path, $mode);
+            });
+        try {
+            MockHelper::$time = time();
+            $cache = new FileCache(self::DIRECTORY, fileMode: 0640, gcProbability: 0);
+            $this->assertTrue($cache->set('key', 'old', 1));
+            $this->assertTrue($cache->set('key', 'new', 1));
+            $this->assertSame('new', $cache->get('key'));
+            MockHelper::$time += 2;
+            $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+            $this->assertFileDoesNotExist($this->invokeMethod($cache, 'getCacheFile', ['key']));
+        } finally {
+            chmod($lock, 0666);
+        }
+    }
+
+    public static function concurrentReadOperations(): array
+    {
+        return [['get'], ['has'], ['gc']];
+    }
+
+    #[RunInSeparateProcess]
+    #[DataProvider('concurrentReadOperations')]
+    public function testPublicationDuringRead(string $operation): void
+    {
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $old = str_repeat('old', 8192);
+        MockHelper::$time = time();
+        $this->assertTrue($cache->set('key', $old, $operation === 'gc' ? 1 : 3600));
+        MockHelper::$time += 2;
+        $armed = true;
+        $process = null;
+        $waitFor = static function (string $file): void {
+            $deadline = microtime(true) + 10;
+            do {
+                clearstatcache(true, $file);
+                if (is_file($file)) {
+                    return;
+                }
+                usleep(1000);
+            } while (microtime(true) < $deadline);
+            throw new RuntimeException('Timed out waiting for ' . $file);
+        };
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fgets')->expects($this->atLeastOnce())
+            ->willReturnCallback(function ($handle, int $length) use (&$armed, &$process, $waitFor): string|false {
+                $header = fgets($handle, $length);
+                if (!$armed) {
+                    return $header;
+                }
+                $armed = false;
+                $process = proc_open(
+                    [PHP_BINARY, __DIR__ . '/publication_writer.php', self::DIRECTORY],
+                    [1 => ['file', self::DIRECTORY . '/@output', 'w'], 2 => ['redirect', 1]],
+                    $pipes,
+                );
+                $this->assertIsResource($process);
+                $waitFor(self::DIRECTORY . '/@prepared');
+                if (PHP_OS_FAMILY === 'Windows') {
+                    usleep(100000);
+                    clearstatcache();
+                    $this->assertFileDoesNotExist(self::DIRECTORY . '/@published');
+                } else {
+                    $waitFor(self::DIRECTORY . '/@published');
+                }
+                return $header;
+            });
+        try {
+            if ($operation === 'get') {
+                $this->assertSame($old, $cache->get('key'));
+            } elseif ($operation === 'has') {
+                $this->assertTrue($cache->has('key'));
+            } else {
+                $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+            }
+        } finally {
+            if (is_resource($process)) {
+                $deadline = microtime(true) + 10;
+                do {
+                    $status = proc_get_status($process);
+                    if (!$status['running']) {
+                        break;
+                    }
+                    usleep(1000);
+                } while (microtime(true) < $deadline);
+                if ($status['running']) {
+                    proc_terminate($process);
+                }
+                proc_close($process);
+                $this->assertFalse($status['running'], 'Publisher did not finish after the reader closed.');
+                $this->assertSame(0, $status['exitcode'], file_get_contents(self::DIRECTORY . '/@output'));
+            }
+        }
+        $this->assertFalse($armed);
+        $this->assertSame('1', file_get_contents(self::DIRECTORY . '/@published'));
+        $this->assertSame(str_repeat('new', 8192), $cache->get('key'));
     }
 }
