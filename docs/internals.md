@@ -33,8 +33,10 @@ open, and replacement requires an exclusive lock. This makes replacement wait fo
 If an external program keeps the file open, replacement can still fail. `set()` then returns `false`
 and keeps the old value.
 
-Existing lock files are opened read-only. Permissions are set only when a lock file is created,
-so other workers do not need to own it or have write access to it.
+Shared locks open existing lock files read-only. Exclusive locks try read-write access first, then
+fall back to read-only access for filesystems that support it. Linux NFS requires write access for
+exclusive locks, so workers running GC need write access to `@gc.lock`.
+Permissions are set only when a lock file is created; other workers do not need to own it.
 
 ### Cleanup
 

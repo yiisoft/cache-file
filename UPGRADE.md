@@ -62,6 +62,10 @@ or `set()` with a TTL to replace its value and expiry. Garbage collection remove
 may still use them. Remove them only after all processes that use the cache have stopped.
 Do not delete or replace `@gc.lock` while the cache is in use.
 
+On Linux NFS, workers running garbage collection need read and write access to `@gc.lock`.
+If workers use different users, configure a shared group and a group-writable `fileMode`, such as `0660`.
+Adjust permissions on an existing lock file as well; changing `fileMode` does not update it.
+
 ### Windows
 
 On Windows, reads hold a shared lock. File replacement waits until cache readers close their files.

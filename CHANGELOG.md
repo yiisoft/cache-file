@@ -12,7 +12,8 @@
   see [UPGRADE.md](UPGRADE.md) for deployment instructions (@samdark)
 - Bug #110: Handle incomplete writes and file replacement failures in `FileCache::set()`, and suppress write warnings (@samdark)
 - Bug #110: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
-- Bug #110: Coordinate file replacement with garbage collection to keep fresh values and skip unreadable entries (@samdark)
+- Bug #110: Coordinate file replacement with garbage collection to keep fresh values and skip unreadable entries,
+  using writable handles for exclusive locks on NFS (@samdark)
 - Bug #110: Avoid exceptions during garbage collection and `FileCache::clear()` when another process has already
   removed a file (@samdark)
 - Chg #110: Retain directories, active temporary files and the internal lock file during garbage collection and

@@ -160,7 +160,7 @@ final class FileCache implements CacheInterface
                 return false;
             }
 
-            $lock = $this->openGcLock();
+            $lock = $this->openGcLock(exclusive: $this->useReadLock);
             if ($lock === false) {
                 return false;
             }
@@ -475,15 +475,21 @@ final class FileCache implements CacheInterface
     }
 
     /** @return resource|false */
-    private function openGcLock()
+    private function openGcLock(bool $exclusive = false)
     {
         $file = $this->cachePath . DIRECTORY_SEPARATOR . self::GC_LOCK_FILE;
-        // Existing locks need only read access, even for an exclusive flock().
+        // NFS requires write access for exclusive locks. Other filesystems may allow read-only access.
+        if ($exclusive && ($lock = @fopen($file, 'r+b')) !== false) {
+            return $lock;
+        }
         if (($lock = @fopen($file, 'rb')) !== false) {
             return $lock;
         }
         if (($lock = @fopen($file, 'x+b')) === false) {
             // Another process may have created it since our first open.
+            if ($exclusive && ($lock = @fopen($file, 'r+b')) !== false) {
+                return $lock;
+            }
             return @fopen($file, 'rb');
         }
         if ($this->fileMode !== null && !@chmod($file, $this->fileMode | 0600)) {
@@ -529,7 +535,7 @@ final class FileCache implements CacheInterface
 
     private function removeExpiredFile(string $file): void
     {
-        if (!$this->isExpired($file) || ($lock = $this->openGcLock()) === false) {
+        if (!$this->isExpired($file) || ($lock = $this->openGcLock(exclusive: true)) === false) {
             return;
         }
         try {

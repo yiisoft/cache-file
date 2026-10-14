@@ -22,6 +22,7 @@ use function is_resource;
 use const PHP_OS_FAMILY;
 use const E_ALL;
 use const PHP_BINARY;
+use const LOCK_EX;
 
 require_once __DIR__ . '/MockHelper.php';
 
@@ -304,6 +305,87 @@ final class ReviewRegressionTest extends TestCase
     public static function concurrentReadOperations(): array
     {
         return [['get', false], ['has', false], ['gc', false], ['get', true], ['has', true], ['gc', true]];
+    }
+
+    public static function exclusiveLockScenarios(): array
+    {
+        return [[false, false], [false, true], [true, false], [true, true]];
+    }
+
+    #[RunInSeparateProcess]
+    #[DataProvider('exclusiveLockScenarios')]
+    public function testExclusiveLockUsesWritableHandle(bool $windowsLocking, bool $concurrentCreation): void
+    {
+        mkdir(self::DIRECTORY, recursive: true);
+        if (!$concurrentCreation) {
+            touch(self::DIRECTORY . '/@gc.lock');
+        }
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fopen')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, string $mode) {
+                if ($mode === 'x+b') {
+                    // Another worker creates the lock before this worker does.
+                    touch($path);
+                    return false;
+                }
+                return fopen($path, $mode);
+            });
+        $exclusiveLocks = 0;
+        $this->getFunctionMock('Yiisoft\Cache\File', 'flock')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function ($handle, int $operation) use (&$exclusiveLocks): bool {
+                if (($operation & LOCK_EX) !== 0) {
+                    ++$exclusiveLocks;
+                    // Linux NFS requires write access for an exclusive lock.
+                    if (!str_contains(stream_get_meta_data($handle)['mode'], '+')) {
+                        return false;
+                    }
+                }
+                return flock($handle, $operation);
+            });
+        MockHelper::$time = time();
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $this->setInaccessibleProperty($cache, 'useReadLock', $windowsLocking);
+        if (!$windowsLocking) {
+            // Create an expired entry without opening the GC lock first.
+            $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
+            file_put_contents($file, serialize('value'));
+            touch($file, MockHelper::$time - 1);
+        } else {
+            $this->assertTrue($cache->set('key', 'value', 1));
+            $this->assertSame('value', $cache->get('key'));
+            MockHelper::$time += 2;
+        }
+        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+        $this->assertGreaterThan(0, $exclusiveLocks);
+        $this->assertFileDoesNotExist($this->invokeMethod($cache, 'getCacheFile', ['key']));
+    }
+
+    #[RunInSeparateProcess]
+    #[DataProvider('exclusiveLockScenarios')]
+    public function testReadOnlyLockFallback(bool $exclusive, bool $concurrentCreation): void
+    {
+        mkdir(self::DIRECTORY, recursive: true);
+        if (!$concurrentCreation) {
+            touch(self::DIRECTORY . '/@gc.lock');
+        }
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fopen')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, string $mode) {
+                if ($mode === 'r+b') {
+                    return false;
+                }
+                if ($mode === 'x+b') {
+                    touch($path);
+                    return false;
+                }
+                return fopen($path, $mode);
+            });
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $lock = $this->invokeMethod($cache, 'openGcLock', [$exclusive]);
+        $this->assertIsResource($lock);
+        try {
+            $this->assertSame('rb', stream_get_meta_data($lock)['mode']);
+        } finally {
+            fclose($lock);
+        }
     }
 
     #[RunInSeparateProcess]
