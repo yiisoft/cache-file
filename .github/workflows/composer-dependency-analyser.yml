@@ -3,6 +3,7 @@ name: composer dependency analyser
 on:
   pull_request:
     paths: &paths
+      - 'benchmarks/**'
       - 'config/**'
       - 'src/**'
       - 'tests/**'

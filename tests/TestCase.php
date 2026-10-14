@@ -10,8 +10,13 @@ use ReflectionException;
 use ReflectionObject;
 use stdClass;
 
+use function array_diff;
 use function is_array;
+use function is_dir;
 use function is_object;
+use function rmdir;
+use function scandir;
+use function unlink;
 
 abstract class TestCase extends \PHPUnit\Framework\TestCase
 {
@@ -150,5 +155,19 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         }
 
         return $result;
+    }
+
+    protected function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+
+        foreach (array_diff(scandir($directory), ['.', '..']) as $item) {
+            $item = "{$directory}/{$item}";
+            is_dir($item) ? $this->removeDirectory($item) : unlink($item);
+        }
+
+        rmdir($directory);
     }
 }

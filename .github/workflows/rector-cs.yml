@@ -3,6 +3,7 @@ name: Rector + PHP CS Fixer
 on:
   pull_request:
     paths:
+      - 'benchmarks/**'
       - 'config/**'
       - 'src/**'
       - 'tests/**'

@@ -11,34 +11,34 @@ use Traversable;
 
 use function array_keys;
 use function array_map;
+use function bin2hex;
 use function closedir;
+use function dirname;
 use function error_get_last;
-use function filemtime;
-use function fileowner;
-use function fopen;
-use function function_exists;
+use function file_exists;
+use function filectime;
 use function is_dir;
 use function is_file;
 use function iterator_to_array;
 use function mkdir;
 use function opendir;
-use function posix_geteuid;
+use function random_bytes;
 use function random_int;
 use function readdir;
 use function restore_error_handler;
-use function rmdir;
 use function serialize;
 use function set_error_handler;
 use function sprintf;
 use function strpbrk;
 use function substr;
-use function unlink;
 use function unserialize;
 
-use const LOCK_EX;
-use const LOCK_SH;
-use const LOCK_UN;
+use function strlen;
+
 use const DIRECTORY_SEPARATOR;
+use const LOCK_EX;
+use const LOCK_NB;
+use const LOCK_SH;
 
 /**
  * `FileCache` implements a cache handler using files.
@@ -53,6 +53,12 @@ final class FileCache implements CacheInterface
 {
     private const TTL_INFINITY = 31_536_000; // 1 year
     private const EXPIRATION_EXPIRED = -1;
+    /**
+     * Cache keys can't contain "@", so neither a cache file nor a cache directory can start with it.
+     */
+    private const TEMPORARY_FILE_PREFIX = '@';
+    private const TEMPORARY_FILE_LIFETIME = 3600;
+    private const GC_LOCK_FILE = '@gc.lock';
 
     /**
      * @param string $cachePath The directory to store cache files.
@@ -89,18 +95,21 @@ final class FileCache implements CacheInterface
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
 
-        if (!$this->existsAndNotExpired($file) || ($filePointer = @fopen($file, 'rb')) === false) {
+        if (($handle = @fopen($file, 'rb')) === false) {
             return $default;
         }
-
-        flock($filePointer, LOCK_SH);
-        /**
-         * @var string $value We assume that we always can read content from `$filePointer` resource.
-         */
-        $value = stream_get_contents($filePointer);
-        flock($filePointer, LOCK_UN);
-        fclose($filePointer);
-
+        try {
+            $metadata = $this->readMetadata($handle);
+            if ($metadata === null || $metadata['expiration'] <= time()) {
+                return $default;
+            }
+            $value = @stream_get_contents($handle, $metadata['length']);
+            if ($value === false || $value === '' || strlen($value) !== $metadata['length']) {
+                return $default;
+            }
+        } finally {
+            fclose($handle);
+        }
         return unserialize($value);
     }
 
@@ -116,32 +125,47 @@ final class FileCache implements CacheInterface
 
         $file = $this->getCacheFile($key, ensureDirectory: true);
 
-        // If ownership differs, the touch call will fail, so we try to
-        // rebuild the file from scratch by deleting it first
-        // https://github.com/yiisoft/yii2/pull/16120
-        if (function_exists('posix_geteuid') && is_file($file) && fileowner($file) !== posix_geteuid()) {
-            @unlink($file);
-        }
+        // Write to a temporary file and move it into place, so other processes
+        // see either the previous or the new value and never a partial one.
+        $temporaryFile = dirname($file) . DIRECTORY_SEPARATOR
+            . self::TEMPORARY_FILE_PREFIX . bin2hex(random_bytes(8)) . '.tmp';
+        $payload = serialize($value);
+        $header = 'YFC1 ' . $expiration . ' ' . strlen($payload) . "\n";
+        $data = [$header, $payload];
+        $length = strlen($header) + strlen($payload);
+        $published = false;
 
-        if (file_put_contents($file, serialize($value), LOCK_EX) === false) {
-            return false;
-        }
-
-        if ($this->fileMode !== null) {
-            $result = @chmod($file, $this->fileMode);
-            if (!$this->isLastErrorSafe($result)) {
+        try {
+            if (@file_put_contents($temporaryFile, $data) !== $length) {
+                // The directory could be removed in the meantime, so try once more.
+                $this->getCacheFile($key, ensureDirectory: true);
+                if (@file_put_contents($temporaryFile, $data) !== $length) {
+                    return false;
+                }
+            }
+            if ($this->fileMode !== null && !@chmod($temporaryFile, $this->fileMode)) {
                 return false;
             }
+
+            $lock = $this->openGcLock();
+            if ($lock === false) {
+                return false;
+            }
+            try {
+                // Writers may publish concurrently, but not while GC checks and removes an entry.
+                $published = flock($lock, LOCK_SH) && @rename($temporaryFile, $file);
+            } finally {
+                fclose($lock);
+            }
+            if ($published) {
+                clearstatcache();
+            }
+            return $published;
+        } finally {
+            if (!$published) {
+                @unlink($temporaryFile);
+            }
         }
-
-        $result = false;
-
-        if (@touch($file, $expiration)) {
-            clearstatcache();
-            $result = true;
-        }
-
-        return $this->isLastErrorSafe($result);
     }
 
     public function delete(string $key): bool
@@ -149,13 +173,7 @@ final class FileCache implements CacheInterface
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
 
-        if (!is_file($file)) {
-            return true;
-        }
-
-        $result = @unlink($file);
-
-        return $this->isLastErrorSafe($result);
+        return !is_file($file) || $this->removeFile($file);
     }
 
     public function clear(): bool
@@ -182,11 +200,12 @@ final class FileCache implements CacheInterface
         $values = $this->iterableToArray($values);
         $this->validateKeys(array_map(\strval(...), array_keys($values)));
 
+        $success = true;
         foreach ($values as $key => $value) {
-            $this->set((string) $key, $value, $ttl);
+            $success = $this->set((string) $key, $value, $ttl) && $success;
         }
 
-        return true;
+        return $success;
     }
 
     public function deleteMultiple(iterable $keys): bool
@@ -383,11 +402,12 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Recursively removing expired cache files under a directory. This method is mainly used by {@see gc()}.
+     * Recursively removing cache files under a directory. Directories are kept, because another process
+     * could be writing to them. This method is mainly used by {@see gc()}.
      *
-     * @param string $path The directory under which expired cache files are removed.
+     * @param string $path The directory under which cache files are removed.
      * @param bool $expiredOnly Whether to only remove expired cache files.
-     * If false, all files under `$path` will be removed.
+     * If false, all cache files under `$path` will be removed.
      */
     private function removeCacheFiles(string $path, bool $expiredOnly): void
     {
@@ -395,27 +415,128 @@ final class FileCache implements CacheInterface
             return;
         }
 
-        while (($file = readdir($handle)) !== false) {
-            if (str_starts_with($file, '.')) {
-                continue;
+        try {
+            while (($file = readdir($handle)) !== false) {
+                if ($file === '.' || $file === '..' || $file === self::GC_LOCK_FILE) {
+                    continue;
+                }
+
+                $fullPath = $path . DIRECTORY_SEPARATOR . $file;
+
+                if (is_dir($fullPath)) {
+                    $this->removeCacheFiles($fullPath, $expiredOnly);
+                    continue;
+                }
+
+                if (str_starts_with($file, self::TEMPORARY_FILE_PREFIX)) {
+                    // A temporary file is in use by `set()` unless it was left by a terminated process.
+                    $created = @filectime($fullPath);
+                    $remove = $created !== false && $created < time() - self::TEMPORARY_FILE_LIFETIME;
+                } elseif (
+                    str_starts_with($file, '.')
+                    && !$this->hasFileSuffix($file)
+                    && ($this->fileSuffix !== '' || !$this->hasCacheHeader($fullPath))
+                ) {
+                    // Not a cache file, for example, ".gitignore".
+                    $remove = false;
+                } elseif ($expiredOnly) {
+                    $this->removeExpiredFile($fullPath);
+                    continue;
+                } else {
+                    $remove = true;
+                }
+
+                if ($remove && !$this->removeFile($fullPath)) {
+                    $errorMessage = error_get_last()['message'] ?? '';
+                    throw new CacheException("Unable to remove file '{$fullPath}': {$errorMessage}");
+                }
+            }
+        } finally {
+            closedir($handle);
+        }
+    }
+
+    /** @return resource|false */
+    private function openGcLock()
+    {
+        $file = $this->cachePath . DIRECTORY_SEPARATOR . self::GC_LOCK_FILE;
+        $lock = @fopen($file, 'c+b');
+        if ($lock !== false && $this->fileMode !== null && !@chmod($file, $this->fileMode | 0600)) {
+            fclose($lock);
+            return false;
+        }
+        return $lock;
+    }
+
+    private function isExpired(string $file): bool
+    {
+        if (($handle = @fopen($file, 'rb')) === false) {
+            return false;
+        }
+        try {
+            $metadata = $this->readMetadata($handle);
+            return $metadata !== null && $metadata['expiration'] <= time();
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    private function removeExpiredFile(string $file): void
+    {
+        if (!$this->isExpired($file) || ($lock = $this->openGcLock()) === false) {
+            return;
+        }
+        try {
+            // Skip a busy publisher. Recheck under the lock: it may have refreshed this key.
+            if (flock($lock, LOCK_EX | LOCK_NB) && $this->isExpired($file) && !$this->removeFile($file)) {
+                $errorMessage = error_get_last()['message'] ?? '';
+                throw new CacheException("Unable to remove file '{$file}': {$errorMessage}");
+            }
+        } finally {
+            fclose($lock);
+        }
+    }
+
+    private function hasCacheHeader(string $file): bool
+    {
+        if (($handle = @fopen($file, 'rb')) === false) {
+            return false;
+        }
+        try {
+            return fread($handle, 5) === 'YFC1 ';
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    private function hasFileSuffix(string $file): bool
+    {
+        return $this->fileSuffix !== '' && str_ends_with($file, $this->fileSuffix);
+    }
+
+    /**
+     * Removes the file. It isn't a failure if the file was already removed by another process.
+     */
+    private function removeFile(string $file): bool
+    {
+        // Another process can remove the file and then store a new one
+        // in its place right before the check, so try more than once.
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            error_clear_last();
+
+            if (@unlink($file) || str_ends_with(error_get_last()['message'] ?? '', 'No such file or directory')) {
+                return true;
             }
 
-            $fullPath = $path . DIRECTORY_SEPARATOR . $file;
+            // The error isn't available when an error handler has handled it.
+            clearstatcache(true, $file);
 
-            if (is_dir($fullPath)) {
-                $this->removeCacheFiles($fullPath, $expiredOnly);
-
-                if (!$expiredOnly && !@rmdir($fullPath)) {
-                    $errorMessage = error_get_last()['message'] ?? '';
-                    throw new CacheException("Unable to remove directory '{$fullPath}': {$errorMessage}");
-                }
-            } elseif ((!$expiredOnly || @filemtime($fullPath) < time()) && !@unlink($fullPath)) {
-                $errorMessage = error_get_last()['message'] ?? '';
-                throw new CacheException("Unable to remove file '{$fullPath}': {$errorMessage}");
+            if (!file_exists($file)) {
+                return true;
             }
         }
 
-        closedir($handle);
+        return false;
     }
 
     /**
@@ -447,7 +568,61 @@ final class FileCache implements CacheInterface
 
     private function existsAndNotExpired(string $file): bool
     {
-        return is_file($file) && @filemtime($file) > time();
+        if (($handle = @fopen($file, 'rb')) === false) {
+            return false;
+        }
+        try {
+            $metadata = $this->readMetadata($handle);
+            if ($metadata === null || $metadata['expiration'] <= time()) {
+                return false;
+            }
+            if ($metadata['length'] <= 4096) {
+                // Small values normally fit in the stream's read buffer after reading the header.
+                $payload = @stream_get_contents($handle, $metadata['length']);
+                return $payload !== false && strlen($payload) === $metadata['length'];
+            }
+            $stat = fstat($handle);
+            // Check payload availability without reading or deserializing the value.
+            $offset = ftell($handle);
+            return $stat !== false && $offset !== false && $stat['size'] - $offset >= $metadata['length'];
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    /**
+     * Read metadata from an immutable opened file and leave the stream at the serialized value.
+     * Legacy files remain readable; older implementations cannot read the new format.
+     *
+     * @param resource $handle
+     * @return array{expiration: int, length: int}|null
+     */
+    private function readMetadata($handle): ?array
+    {
+        $header = @fgets($handle, 128);
+        if ($header === false) {
+            return null;
+        }
+        if (str_starts_with($header, 'YFC1 ')) {
+            if (preg_match('/\AYFC1 ([0-9]+) ([0-9]+)\n\z/', $header, $matches) !== 1) {
+                return null;
+            }
+            $length = (int) $matches[2];
+            if ($length <= 0) {
+                return null;
+            }
+            return [
+                'expiration' => (int) $matches[1],
+                'length' => $length,
+            ];
+        }
+
+        // Migration path for serialized values whose expiration was stored in mtime.
+        $stat = fstat($handle);
+        if ($stat === false || !rewind($handle) || $stat['size'] === 0) {
+            return null;
+        }
+        return ['expiration' => $stat['mtime'], 'length' => $stat['size']];
     }
 
     /**
@@ -461,28 +636,5 @@ final class FileCache implements CacheInterface
     private function iterableToArray(iterable $iterable): array
     {
         return $iterable instanceof Traversable ? iterator_to_array($iterable) : $iterable;
-    }
-
-    /**
-     * Check if error was because of file was already deleted by another process on high load.
-     */
-    private function isLastErrorSafe(bool $result): bool
-    {
-        if ($result !== false) {
-            return true;
-        }
-
-        $lastError = error_get_last();
-
-        if ($lastError === null) {
-            return true;
-        }
-
-        if (str_ends_with($lastError['message'] ?? '', 'No such file or directory')) {
-            error_clear_last();
-            return true;
-        }
-
-        return false;
     }
 }

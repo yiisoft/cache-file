@@ -22,19 +22,13 @@ use function array_map;
 use function dirname;
 use function fileperms;
 use function file_put_contents;
-use function function_exists;
-use function glob;
-use function is_dir;
 use function is_object;
-use function posix_geteuid;
-use function rmdir;
 use function sprintf;
+use function str_repeat;
 use function str_replace;
 use function substr;
 use function sys_get_temp_dir;
 use function time;
-use function uniqid;
-use function unlink;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -288,38 +282,6 @@ final class FileCacheTest extends TestCase
         $this->assertNull($this->cache->get('expire_test'));
     }
 
-    /**
-     * We have to on separate process because of PHPMock not being able to mock a function that
-     * was already called.
-     *
-     * runInSeparateProcess
-     */
-    public function testCacheRenewalOnDifferentOwnership(): void
-    {
-        if (!function_exists('posix_geteuid')) {
-            $this->markTestSkipped('Can not test without posix extension installed.');
-        }
-
-        $cacheValue = uniqid('value_', false);
-        $cacheKey = uniqid('key_', false);
-
-        MockHelper::$time = time();
-        $this->assertTrue($this->cache->set($cacheKey, $cacheValue, 2));
-        $this->assertSame($cacheValue, $this->cache->get($cacheKey));
-
-        // Override fileowner method so it always returns something not equal to the current user
-        $notCurrentEuid = posix_geteuid() + 15;
-        $this
-            ->getFunctionMock('Yiisoft\Cache\File', 'fileowner')
-            ->expects($this->any())
-            ->willReturn($notCurrentEuid);
-
-        $this->assertTrue(
-            $this->cache->set($cacheKey, uniqid('value_2_', false), 2),
-            'Cannot rebuild cache on different file ownership',
-        );
-    }
-
     public function testSetWithDateIntervalTtl(): void
     {
         $this->cache->set('a', 1, new DateInterval('PT1H'));
@@ -459,6 +421,84 @@ final class FileCacheTest extends TestCase
         $this->assertFileDoesNotExist($cacheFile);
     }
 
+    public function testSetWithKeyOfMaximumFileNameLength(): void
+    {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Path length is limited on Windows.');
+        }
+
+        // 255 bytes is a common file name limit, 4 bytes are taken by the ".bin" suffix.
+        $key = str_repeat('a', 251);
+
+        $this->assertTrue($this->cache->set($key, 'value'));
+        $this->assertSame('value', $this->cache->get($key));
+    }
+
+    public function testClearAndGcRemoveItemWithKeyStartingWithDot(): void
+    {
+        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 1_000_000);
+        MockHelper::$time = time();
+
+        $cache->set('.clear', 'value');
+        $this->assertTrue($cache->clear());
+        $this->assertFalse($cache->has('.clear'));
+
+        $cache->set('.gc', 'value', 1);
+        $file = $this->invokeMethod($cache, 'getCacheFile', ['.gc']);
+        MockHelper::$time += 2;
+        $cache->set('key', 'value');
+
+        $this->assertFileDoesNotExist($file);
+    }
+
+    public function testClearAndGcKeepDotFileThatIsNotCacheFile(): void
+    {
+        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 1_000_000);
+        $cache->set('key', 'value');
+        $file = self::RUNTIME_DIRECTORY . '/cache/.gitignore';
+        file_put_contents($file, '*');
+        touch($file, time() - 10);
+
+        $cache->set('key', 'value');
+        $this->assertTrue($cache->clear());
+
+        $this->assertFileExists($file);
+    }
+
+    public function testClearKeepsDirectories(): void
+    {
+        $this->cache->set('key', 'value');
+        $directory = dirname($this->invokeMethod($this->cache, 'getCacheFile', ['key']));
+
+        $this->assertTrue($this->cache->clear());
+
+        $this->assertFalse($this->cache->has('key'));
+        $this->assertDirectoryExists($directory);
+    }
+
+    public function testClearAndGcRemoveOnlyStaleTemporaryFile(): void
+    {
+        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 1_000_000);
+        $cache->set('key', 'value');
+        $file = dirname($this->invokeMethod($cache, 'getCacheFile', ['key'])) . '/@0123456789abcdef.tmp';
+
+        // Modification time is in the past as it is for a file that is being written.
+        file_put_contents($file, 'data');
+        touch($file, time() - 10);
+        $cache->set('key', 'value');
+        $this->assertTrue($cache->clear());
+        $this->assertFileExists($file);
+
+        MockHelper::$time = time() + 3601;
+        $cache->set('key', 'value');
+        $this->assertFileDoesNotExist($file);
+
+        file_put_contents($file, 'data');
+        MockHelper::$time = time() + 3601;
+        $this->assertTrue($cache->clear());
+        $this->assertFileDoesNotExist($file);
+    }
+
     public function testDeleteForCacheItemNotExist(): void
     {
         $this->assertNull($this->cache->get('key'));
@@ -537,7 +577,7 @@ final class FileCacheTest extends TestCase
         $cacheFile = $refMethodGetCacheFile->invoke($this->cache, __FUNCTION__);
 
         // simulate cache expire 10 seconds ago
-        touch($cacheFile, time() - 10);
+        file_put_contents($cacheFile, 'YFC1 ' . (time() - 10) . " 2\nN;");
         clearstatcache();
 
         $this->assertNull($this->cache->get(__FUNCTION__));
@@ -658,20 +698,5 @@ final class FileCacheTest extends TestCase
     private function normalizePath(string $path): string
     {
         return str_replace('\\', '/', $path);
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        if ($items = glob("{$directory}/*")) {
-            foreach ($items as $item) {
-                is_dir($item) ? $this->removeDirectory($item) : unlink($item);
-            }
-        }
-
-        rmdir($directory);
     }
 }

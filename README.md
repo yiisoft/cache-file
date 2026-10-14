@@ -158,12 +158,27 @@ To work with values in a more efficient manner, batch operations should be used:
 
 This package can be used as a cache handler for the [Yii Caching Library](https://github.com/yiisoft/cache).
 
+## Cache file compatibility
+
+Writes publish the expiry and serialized value together by atomically replacing the cache file.
+Existing files with expiry stored in their modification time remain readable; subsequent writes use the new format.
+Older package versions cannot read the new files. The default cache path remains `@runtime/cache`.
+Stop all cache users and clear the cache when upgrading or rolling back. For rolling deployments,
+configure separate cache directories for old and new versions.
+
+See the [upgrade guide](UPGRADE.md) for deployment, rollback, and cleanup instructions.
+
 ## Documentation
 
 - [Internals](docs/internals.md)
 
 If you need help or have a question, the [Yii Forum](https://forum.yiiframework.com/c/yii-3-0/63) is a good place for that.
 You may also check out other [Yii Community Resources](https://www.yiiframework.com/community).
+
+## Benchmarks
+
+Run `composer benchmark` after installing development dependencies. See the
+[benchmark guide](benchmarks/README.md) for scenarios, filesystem selection, and comparing changes.
 
 ## License
 

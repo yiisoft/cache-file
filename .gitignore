@@ -36,3 +36,8 @@ analysis.txt
 # PHP CS Fixer
 /.php-cs-fixer.cache
 /.php-cs-fixer.php
+
+# PHPBench
+/.phpbench/
+/phpbench.json
+/benchmarks/runtime/
