@@ -19,11 +19,18 @@ for expiration. Legacy files without a header are read using their modification 
 `set()` writes the complete record to a short random temporary filename in the same directory, checks the
 byte count, applies the configured permissions, and renames it into place. Header and payload are written
 as separate chunks to avoid allocating a second full copy of the serialized value. Published files are not modified
-in place, so readers need no shared lock. This provides atomic visibility, not durability against power loss.
-Publication holds a shared lock on the cache root’s `@gc.lock` file. Before removing an expired entry,
+in place. This provides atomic visibility, not durability against power loss.
+
+On most platforms, readers take no lock and publication holds a shared lock on the cache root’s `@gc.lock` file.
+On Windows, readers hold a shared lock while the cache file is open, and publication takes an exclusive lock.
+This lets readers finish before Windows replaces the file. External programs holding files open can still block
+replacement; `set()` then returns `false` and preserves the old value.
+
+Before removing an expired entry,
 garbage collection takes an exclusive lock and rechecks its expiry, so it cannot delete a freshly published
-replacement. Live entries are scanned without this lock; busy publishers cause GC to skip deletion.
-Unreadable entries and entries with unrecognizable expiry are left alone. Readers do not take this lock.
+replacement. Busy publishers cause GC to skip deletion. Unreadable entries and entries with unrecognizable expiry
+are left alone. Existing lock files are opened read-only; configured permissions are applied only when creating them,
+so workers sharing a cache do not need to own the lock file.
 
 Garbage collection and `clear()` preserve the lock file, directories and active temporary files; stale
 temporary files are eligible for cleanup after one hour. Remove retained directories and the lock file only after stopping
