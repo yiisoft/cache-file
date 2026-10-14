@@ -23,7 +23,6 @@ use function iterator_to_array;
 use function mkdir;
 use function opendir;
 use function random_bytes;
-use function random_int;
 use function readdir;
 use function restore_error_handler;
 use function serialize;

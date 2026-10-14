@@ -8,6 +8,7 @@ use phpmock\phpunit\PHPMock;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use Yiisoft\Cache\File\FileCache;
+use Yiisoft\Cache\File\MockHelper;
 
 use function basename;
 use function clearstatcache;
@@ -33,6 +34,7 @@ final class RaceConditionTest extends TestCase
 
     protected function tearDown(): void
     {
+        MockHelper::$time = null;
         $this->removeDirectory(dirname(self::CACHE_DIRECTORY));
     }
 
@@ -40,7 +42,7 @@ final class RaceConditionTest extends TestCase
     public function testItemDeletedByAnotherProcessDuringSetIsNotCorrupted(): void
     {
         $cache = new FileCache(self::CACHE_DIRECTORY);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = null;
         $armed = false;
         $raced = false;
 
@@ -48,7 +50,7 @@ final class RaceConditionTest extends TestCase
             ->getFunctionMock(self::MOCK_NAMESPACE, 'rename')
             ->expects($this->any())
             ->willReturnCallback(
-                static function (string $filename, string $destination) use ($file, &$armed, &$raced): bool {
+                static function (string $filename, string $destination) use (&$file, &$armed, &$raced): bool {
                     if ($armed && is_file($file)) {
                         $raced = unlink($file);
                     }
@@ -57,6 +59,7 @@ final class RaceConditionTest extends TestCase
             );
 
         $cache->set('key', 'old');
+        $file = $this->findCacheFile(self::CACHE_DIRECTORY, 'key.bin');
         $armed = true;
         $cache->set('key', 'new');
         clearstatcache();
@@ -69,7 +72,7 @@ final class RaceConditionTest extends TestCase
     public function testSetFailsWithoutCorruptingItemWhenTemporaryFileIsRemoved(): void
     {
         $cache = new FileCache(self::CACHE_DIRECTORY);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = null;
         $armed = false;
         $raced = false;
 
@@ -86,6 +89,7 @@ final class RaceConditionTest extends TestCase
             );
 
         $cache->set('key', 'old');
+        $file = $this->findCacheFile(self::CACHE_DIRECTORY, 'key.bin');
         $armed = true;
         $result = $cache->set('key', 'new');
         clearstatcache();
@@ -128,7 +132,7 @@ final class RaceConditionTest extends TestCase
     #[RunInSeparateProcess]
     public function testGcIgnoresFileRemovedByAnotherProcess(): void
     {
-        $cache = new FileCache(self::CACHE_DIRECTORY, gcProbability: 1_000_000);
+        $cache = new FileCache(self::CACHE_DIRECTORY, gcProbability: 0);
         $expiredFile = null;
         $raced = false;
 
@@ -144,14 +148,16 @@ final class RaceConditionTest extends TestCase
                 },
             );
 
-        $cache->set('expired', 'value');
-        $expiredFile = $this->invokeMethod($cache, 'getCacheFile', ['expired']);
-        touch($expiredFile, time() - 10);
+        MockHelper::$time = time();
+        $cache->set('expired', 'value', 1);
+        $expiredFile = $this->findCacheFile(self::CACHE_DIRECTORY, 'expired.bin');
+        MockHelper::$time += 2;
         clearstatcache();
 
-        $this->assertTrue($cache->set('key', 'value'));
+        $this->collectGarbage($cache);
+
         $this->assertTrue($raced, 'The race was not simulated.');
-        $this->assertSame('value', $cache->get('key'));
+        $this->assertFalse($cache->has('expired'));
     }
 
     #[RunInSeparateProcess]

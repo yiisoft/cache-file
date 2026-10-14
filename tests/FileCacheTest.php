@@ -434,33 +434,44 @@ final class FileCacheTest extends TestCase
         $this->assertSame('value', $this->cache->get($key));
     }
 
-    public function testClearAndGcRemoveItemWithKeyStartingWithDot(): void
+    public static function cleanupOperations(): array
     {
-        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 1_000_000);
+        return ['clear' => [false], 'gc' => [true]];
+    }
+
+    #[DataProvider('cleanupOperations')]
+    public function testCleanupRemovesItemWithKeyStartingWithDot(bool $expiredOnly): void
+    {
+        $directory = self::RUNTIME_DIRECTORY . '/cache';
+        $cache = new FileCache($directory, gcProbability: 0);
         MockHelper::$time = time();
-
-        $cache->set('.clear', 'value');
-        $this->assertTrue($cache->clear());
-        $this->assertFalse($cache->has('.clear'));
-
-        $cache->set('.gc', 'value', 1);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['.gc']);
+        $cache->set('.key', 'value', 1);
+        $file = $this->findCacheFile($directory, '.key.bin');
         MockHelper::$time += 2;
-        $cache->set('key', 'value');
+
+        if ($expiredOnly) {
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
 
         $this->assertFileDoesNotExist($file);
     }
 
-    public function testClearAndGcKeepDotFileThatIsNotCacheFile(): void
+    #[DataProvider('cleanupOperations')]
+    public function testCleanupKeepsDotFileThatIsNotCacheFile(bool $expiredOnly): void
     {
-        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 1_000_000);
+        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 0);
         $cache->set('key', 'value');
         $file = self::RUNTIME_DIRECTORY . '/cache/.gitignore';
         file_put_contents($file, '*');
         touch($file, time() - 10);
 
-        $cache->set('key', 'value');
-        $this->assertTrue($cache->clear());
+        if ($expiredOnly) {
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
 
         $this->assertFileExists($file);
     }
@@ -468,35 +479,47 @@ final class FileCacheTest extends TestCase
     public function testClearKeepsDirectories(): void
     {
         $this->cache->set('key', 'value');
-        $directory = dirname($this->invokeMethod($this->cache, 'getCacheFile', ['key']));
+        $directory = dirname($this->findCacheFile(self::RUNTIME_DIRECTORY . '/cache', 'key.bin'));
 
-        $this->assertTrue($this->cache->clear());
+        $result = $this->cache->clear();
 
+        $this->assertTrue($result);
         $this->assertFalse($this->cache->has('key'));
         $this->assertDirectoryExists($directory);
     }
 
-    public function testClearAndGcRemoveOnlyStaleTemporaryFile(): void
+    public static function temporaryFileCleanupOperations(): array
     {
-        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 1_000_000);
-        $cache->set('key', 'value');
-        $file = dirname($this->invokeMethod($cache, 'getCacheFile', ['key'])) . '/@0123456789abcdef.tmp';
+        return [
+            'clear-recent' => [false, false],
+            'clear-stale' => [false, true],
+            'gc-recent' => [true, false],
+            'gc-stale' => [true, true],
+        ];
+    }
 
-        // Modification time is in the past as it is for a file that is being written.
+    #[DataProvider('temporaryFileCleanupOperations')]
+    public function testCleanupRemovesOnlyStaleTemporaryFile(bool $expiredOnly, bool $stale): void
+    {
+        $directory = self::RUNTIME_DIRECTORY . '/cache';
+        $cache = new FileCache($directory, gcProbability: 0);
+        $cache->set('key', 'value');
+        $file = dirname($this->findCacheFile($directory, 'key.bin')) . '/@0123456789abcdef.tmp';
         file_put_contents($file, 'data');
         touch($file, time() - 10);
-        $cache->set('key', 'value');
-        $this->assertTrue($cache->clear());
-        $this->assertFileExists($file);
+        MockHelper::$time = time() + ($stale ? 3601 : 0);
 
-        MockHelper::$time = time() + 3601;
-        $cache->set('key', 'value');
-        $this->assertFileDoesNotExist($file);
+        if ($expiredOnly) {
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
 
-        file_put_contents($file, 'data');
-        MockHelper::$time = time() + 3601;
-        $this->assertTrue($cache->clear());
-        $this->assertFileDoesNotExist($file);
+        if ($stale) {
+            $this->assertFileDoesNotExist($file);
+        } else {
+            $this->assertFileExists($file);
+        }
     }
 
     public function testDeleteForCacheItemNotExist(): void

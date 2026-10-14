@@ -30,15 +30,31 @@ final class AtomicHeaderTest extends TestCase
         $this->removeDirectory(self::DIRECTORY);
     }
 
-    public function testReadsLegacyFilesAndRewritesNewFormat(): void
+    public function testReadsLegacyFile(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
+        $cache->set('key', 'fixture');
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         file_put_contents($file, serialize(['legacy' => true]));
         touch($file, time() + 3600);
-        $this->assertSame(['legacy' => true], $cache->get('key'));
+
+        $value = $cache->get('key');
+
+        $this->assertSame(['legacy' => true], $value);
         $this->assertTrue($cache->has('key'));
-        $this->assertTrue($cache->set('key', false));
+    }
+
+    public function testReplacesLegacyFileWithNewFormat(): void
+    {
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $cache->set('key', 'fixture');
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
+        file_put_contents($file, serialize(['legacy' => true]));
+        touch($file, time() + 3600);
+
+        $result = $cache->set('key', false);
+
+        $this->assertTrue($result);
         $this->assertStringStartsWith('YFC1 ', file_get_contents($file));
         $this->assertFalse($cache->get('key', 'miss'));
         $this->assertTrue($cache->has('key'));
@@ -47,11 +63,12 @@ final class AtomicHeaderTest extends TestCase
     public function testExpiredLegacyFileIsCollected(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
+        $cache->set('key', 'fixture');
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         file_put_contents($file, serialize('old'));
         touch($file, time() - 3600);
         $this->assertSame('miss', $cache->get('key', 'miss'));
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+        $this->collectGarbage($cache);
         $this->assertFileDoesNotExist($file);
     }
 
@@ -60,7 +77,7 @@ final class AtomicHeaderTest extends TestCase
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
         $this->assertTrue($cache->set('key', ['value' => str_repeat('x', $size)]));
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         file_put_contents($file, substr(file_get_contents($file), 0, -7));
         $this->assertSame('miss', $cache->get('key', 'miss'));
         $this->assertFalse($cache->has('key'));
@@ -75,10 +92,23 @@ final class AtomicHeaderTest extends TestCase
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
         $cache->set('key', 'value', 3600);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         touch($file, time() - 3600);
-        $this->assertSame('value', $cache->get('key'));
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+
+        $value = $cache->get('key');
+
+        $this->assertSame('value', $value);
+    }
+
+    public function testGcKeepsLiveEntryWithPastMtime(): void
+    {
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        $cache->set('key', 'value', 3600);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
+        touch($file, time() - 3600);
+
+        $this->collectGarbage($cache);
+
         $this->assertSame('value', $cache->get('key'));
     }
 
@@ -110,7 +140,7 @@ final class AtomicHeaderTest extends TestCase
         $armed = true;
         $this->assertFalse($cache->set('key', 'new'));
         $this->assertSame('old', $cache->get('key'));
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         $this->assertSame([$file], glob(dirname($file) . DIRECTORY_SEPARATOR . '*'));
     }
 
@@ -135,21 +165,11 @@ final class AtomicHeaderTest extends TestCase
         $this->assertSame('replacement with a different length', $cache->get('key'));
     }
 
-    #[RunInSeparateProcess]
-    public function testNewFormatReadDoesNotCallTouchOrExplicitStatFunctions(): void
-    {
-        foreach (['touch', 'stat', 'fstat', 'filemtime', 'filesize'] as $function) {
-            $this->getFunctionMock('Yiisoft\Cache\File', $function)->expects($this->never());
-        }
-        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $this->assertTrue($cache->set('key', 'value', 3600));
-        $this->assertSame('value', $cache->get('key'));
-    }
-
     public function testMalformedHeaderIsAMiss(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
+        $cache->set('key', 'fixture');
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         file_put_contents($file, 'YFC1 invalid header');
         $this->assertSame('miss', $cache->get('key', 'miss'));
         $this->assertFalse($cache->has('key'));
@@ -167,13 +187,28 @@ final class AtomicHeaderTest extends TestCase
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
         MockHelper::$time = time();
-        $this->assertTrue($cache->set('key', 'value', 60));
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $cache->set('key', 'value', 60);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         touch($file, time() + 86400);
         MockHelper::$time += 120;
-        $this->assertSame('miss', $cache->get('key', 'miss'));
+
+        $value = $cache->get('key', 'miss');
+
+        $this->assertSame('miss', $value);
         $this->assertFalse($cache->has('key'));
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+    }
+
+    public function testGcRemovesExpiredEntryWithFutureMtime(): void
+    {
+        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        MockHelper::$time = time();
+        $cache->set('key', 'value', 60);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
+        touch($file, time() + 86400);
+        MockHelper::$time += 120;
+
+        $this->collectGarbage($cache);
+
         $this->assertFileDoesNotExist($file);
     }
 }

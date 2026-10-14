@@ -57,7 +57,7 @@ final class ReviewRegressionTest extends TestCase
         $cache->set('key', 'old', 1);
         MockHelper::$time += 2;
         $armed = true;
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+        $this->collectGarbage($cache);
         $this->assertFalse($armed);
         $this->assertSame('fresh', $cache->get('key'));
     }
@@ -68,7 +68,7 @@ final class ReviewRegressionTest extends TestCase
     public function testPublisherCannotReplaceEntryBetweenGcCheckAndUnlink(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = null;
         $child = false;
         $collecting = false;
         $interleaved = false;
@@ -92,7 +92,7 @@ final class ReviewRegressionTest extends TestCase
                 return $result;
             });
         $this->getFunctionMock('Yiisoft\Cache\File', 'unlink')->expects($this->atLeastOnce())
-            ->willReturnCallback(function (string $path) use ($file, &$collecting, &$interleaved, $waitFor): bool {
+            ->willReturnCallback(function (string $path) use (&$file, &$collecting, &$interleaved, $waitFor): bool {
                 if ($collecting && $path === $file) {
                     $interleaved = true;
                     touch(self::DIRECTORY . '/@go');
@@ -105,6 +105,7 @@ final class ReviewRegressionTest extends TestCase
             });
         MockHelper::$time = time();
         $cache->set('key', 'expired', 1);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         MockHelper::$time += 2;
         $pid = pcntl_fork();
         $this->assertNotSame(-1, $pid);
@@ -120,7 +121,7 @@ final class ReviewRegressionTest extends TestCase
         }
         try {
             $collecting = true;
-            $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+            $this->collectGarbage($cache);
         } finally {
             touch(self::DIRECTORY . '/@go');
             pcntl_waitpid($pid, $status);
@@ -141,9 +142,9 @@ final class ReviewRegressionTest extends TestCase
                 return $path === $blocked ? false : fopen($path, $mode);
             });
         $cache->set('key', 'live', 3600);
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         $blocked = $file;
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+        $this->collectGarbage($cache);
         $blocked = null;
         $this->assertFileExists($file);
         $this->assertSame('live', $cache->get('key'));
@@ -192,36 +193,58 @@ final class ReviewRegressionTest extends TestCase
         $this->assertSame('old', $cache->get('key'));
     }
 
-    public static function directoryLevels(): array
+    public static function cleanupOperations(): array
     {
-        return [[0], [1], [2]];
+        return ['clear' => [false], 'gc' => [true]];
     }
 
-    #[DataProvider('directoryLevels')]
-    public function testDotKeysWithoutSuffixAreClearedAndCollected(int $level): void
+    public static function directoryCleanupOperations(): array
+    {
+        $cases = [];
+        foreach ([0, 1, 2] as $level) {
+            foreach (self::cleanupOperations() as $operation => [$expiredOnly]) {
+                $cases["$operation-level$level"] = [$level, $expiredOnly];
+            }
+        }
+        return $cases;
+    }
+
+    public static function dotKeyCleanupOperations(): array
+    {
+        $cases = [];
+        foreach (self::directoryCleanupOperations() as $name => [$level, $expiredOnly]) {
+            foreach (['.foo', '.gitignore'] as $key) {
+                $cases["$name-$key"] = [$level, $expiredOnly, $key];
+            }
+        }
+        return $cases;
+    }
+
+    #[DataProvider('dotKeyCleanupOperations')]
+    public function testCleanupRemovesDotKeyWithoutSuffix(int $level, bool $expiredOnly, string $key): void
     {
         MockHelper::$time = time();
         $cache = new FileCache(self::DIRECTORY, fileSuffix: '', directoryLevel: $level, gcProbability: 0);
-        $cache->set('.foo', 1);
-        file_put_contents(self::DIRECTORY . '/.gitignore', '*');
-        $this->assertTrue($cache->clear());
-        $this->assertNull($cache->get('.foo'));
-        $this->assertSame('*', file_get_contents(self::DIRECTORY . '/.gitignore'));
-        $cache->set('.foo', 2, 1);
+        $cache->set($key, 1, 1);
+        $file = $this->findCacheFile(self::DIRECTORY, $key);
+        file_put_contents(self::DIRECTORY . '/.keep', '*');
         MockHelper::$time += 2;
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
-        $this->assertFileDoesNotExist($this->invokeMethod($cache, 'getCacheFile', ['.foo']));
-        // The same dot filename is a cache entry when it contains our record.
-        $cache->set('.gitignore', 'cached');
-        $this->assertTrue($cache->clear());
-        $this->assertNull($cache->get('.gitignore'));
+
+        if ($expiredOnly) {
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
+
+        $this->assertFileDoesNotExist($file);
+        $this->assertSame('*', file_get_contents(self::DIRECTORY . '/.keep'));
     }
 
     public function testReplacementWhileOldFileIsOpen(): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
         $this->assertTrue($cache->set('key', 'old'));
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key']);
+        $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
         $reader = fopen($file, 'rb');
         try {
             if (PHP_OS_FAMILY === 'Windows') {
@@ -237,27 +260,31 @@ final class ReviewRegressionTest extends TestCase
         } finally {
             fclose($reader);
         }
-        $this->assertTrue($cache->set('key', 'new'));
-        $this->assertSame('new', $cache->get('key'));
     }
 
-    public function testClearAndGcRetainThePublicationLock(): void
+    #[DataProvider('cleanupOperations')]
+    public function testCleanupRetainsThePublicationLock(bool $expiredOnly): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
         $cache->set('key', 'value');
         $file = self::DIRECTORY . '/@gc.lock';
         $before = stat($file);
-        $cache->clear();
         MockHelper::$time = time() + 7200;
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+
+        if ($expiredOnly) {
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
+
         clearstatcache();
         $after = stat($file);
         $this->assertSame($before['ino'], $after['ino']);
         $this->assertSame($before['dev'], $after['dev']);
     }
 
-    #[DataProvider('directoryLevels')]
-    public function testCleanupPreservesUnrelatedHiddenDirectories(int $level): void
+    #[DataProvider('directoryCleanupOperations')]
+    public function testCleanupPreservesUnrelatedHiddenDirectories(int $level, bool $expiredOnly): void
     {
         $cache = new FileCache(self::DIRECTORY, directoryLevel: $level, gcProbability: 0);
         $paths = [self::DIRECTORY . '/.git/objects', self::DIRECTORY . '/ab/.config'];
@@ -268,16 +295,26 @@ final class ReviewRegressionTest extends TestCase
             touch($path . '/keep', time() - 3600);
         }
         $this->assertTrue($cache->set('.foo', 'cached'));
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
-        $this->assertTrue($cache->clear());
+        if ($expiredOnly) {
+            MockHelper::$time = time() + 31_536_001;
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
         $this->assertNull($cache->get('.foo'));
         foreach ($paths as $path) {
             $this->assertSame('unrelated', file_get_contents($path . '/keep'));
         }
     }
 
+    public static function lockOperations(): array
+    {
+        return ['write' => ['set'], 'gc' => ['gc']];
+    }
+
     #[RunInSeparateProcess]
-    public function testExistingReadOnlyLockDoesNotRequireOwnership(): void
+    #[DataProvider('lockOperations')]
+    public function testExistingReadOnlyLockDoesNotRequireOwnership(string $operation): void
     {
         mkdir(self::DIRECTORY, recursive: true);
         $lock = self::DIRECTORY . '/@gc.lock';
@@ -291,12 +328,20 @@ final class ReviewRegressionTest extends TestCase
         try {
             MockHelper::$time = time();
             $cache = new FileCache(self::DIRECTORY, fileMode: 0640, gcProbability: 0);
-            $this->assertTrue($cache->set('key', 'old', 1));
-            $this->assertTrue($cache->set('key', 'new', 1));
-            $this->assertSame('new', $cache->get('key'));
-            MockHelper::$time += 2;
-            $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
-            $this->assertFileDoesNotExist($this->invokeMethod($cache, 'getCacheFile', ['key']));
+            $cache->set('key', 'old', 1);
+            $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
+
+            if ($operation === 'gc') {
+                MockHelper::$time += 2;
+                $this->collectGarbage($cache);
+
+                $this->assertFileDoesNotExist($file);
+            } else {
+                $result = $cache->set('key', 'new');
+
+                $this->assertTrue($result);
+                $this->assertSame('new', $cache->get('key'));
+            }
         } finally {
             chmod($lock, 0666);
         }
@@ -304,66 +349,71 @@ final class ReviewRegressionTest extends TestCase
 
     public static function concurrentReadOperations(): array
     {
-        return [['get', false], ['has', false], ['gc', false], ['get', true], ['has', true], ['gc', true]];
+        return [['get'], ['has'], ['gc']];
     }
 
-    public static function exclusiveLockScenarios(): array
+    public static function lockCreationScenarios(): array
     {
-        return [[false, false], [false, true], [true, false], [true, true]];
+        return [
+            'gc-existing' => ['gc', false],
+            'gc-created-concurrently' => ['gc', true],
+            'write-existing' => ['set', false],
+            'write-created-concurrently' => ['set', true],
+        ];
     }
 
     #[RunInSeparateProcess]
-    #[DataProvider('exclusiveLockScenarios')]
-    public function testExclusiveLockUsesWritableHandle(bool $windowsLocking, bool $concurrentCreation): void
+    #[DataProvider('lockCreationScenarios')]
+    public function testExclusiveOperationUsesWritableLock(string $operation, bool $concurrentCreation): void
     {
+        if ($operation === 'set' && PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Only Windows publication requires an exclusive lock.');
+        }
         mkdir(self::DIRECTORY, recursive: true);
+        $file = self::DIRECTORY . '/key.bin';
+        file_put_contents($file, serialize('old'));
+        touch($file, time() - 1);
         if (!$concurrentCreation) {
             touch(self::DIRECTORY . '/@gc.lock');
         }
         $this->getFunctionMock('Yiisoft\Cache\File', 'fopen')->expects($this->atLeastOnce())
             ->willReturnCallback(static function (string $path, string $mode) {
                 if ($mode === 'x+b') {
-                    // Another worker creates the lock before this worker does.
                     touch($path);
                     return false;
                 }
                 return fopen($path, $mode);
             });
-        $exclusiveLocks = 0;
         $this->getFunctionMock('Yiisoft\Cache\File', 'flock')->expects($this->atLeastOnce())
-            ->willReturnCallback(static function ($handle, int $operation) use (&$exclusiveLocks): bool {
-                if (($operation & LOCK_EX) !== 0) {
-                    ++$exclusiveLocks;
-                    // Linux NFS requires write access for an exclusive lock.
-                    if (!str_contains(stream_get_meta_data($handle)['mode'], '+')) {
-                        return false;
-                    }
+            ->willReturnCallback(static function ($handle, int $operation): bool {
+                // Linux NFS requires write access for an exclusive lock.
+                if (($operation & LOCK_EX) !== 0 && !str_contains(stream_get_meta_data($handle)['mode'], '+')) {
+                    return false;
                 }
                 return flock($handle, $operation);
             });
-        MockHelper::$time = time();
-        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $this->setInaccessibleProperty($cache, 'useReadLock', $windowsLocking);
-        if (!$windowsLocking) {
-            // Create an expired entry without opening the GC lock first.
-            $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
-            file_put_contents($file, serialize('value'));
-            touch($file, MockHelper::$time - 1);
+        $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
+
+        if ($operation === 'gc') {
+            $this->collectGarbage($cache);
+
+            $this->assertFileDoesNotExist($file);
         } else {
-            $this->assertTrue($cache->set('key', 'value', 1));
-            $this->assertSame('value', $cache->get('key'));
-            MockHelper::$time += 2;
+            $result = $cache->set('key', 'new');
+
+            $this->assertTrue($result);
+            $this->assertSame('new', $cache->get('key'));
         }
-        $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
-        $this->assertGreaterThan(0, $exclusiveLocks);
-        $this->assertFileDoesNotExist($this->invokeMethod($cache, 'getCacheFile', ['key']));
     }
 
     #[RunInSeparateProcess]
-    #[DataProvider('exclusiveLockScenarios')]
-    public function testReadOnlyLockFallback(bool $exclusive, bool $concurrentCreation): void
+    #[DataProvider('lockCreationScenarios')]
+    public function testOperationAcceptsReadOnlyLock(string $operation, bool $concurrentCreation): void
     {
         mkdir(self::DIRECTORY, recursive: true);
+        $file = self::DIRECTORY . '/key.bin';
+        file_put_contents($file, serialize('old'));
+        touch($file, time() - 1);
         if (!$concurrentCreation) {
             touch(self::DIRECTORY . '/@gc.lock');
         }
@@ -378,13 +428,17 @@ final class ReviewRegressionTest extends TestCase
                 }
                 return fopen($path, $mode);
             });
-        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $lock = $this->invokeMethod($cache, 'openGcLock', [$exclusive]);
-        $this->assertIsResource($lock);
-        try {
-            $this->assertSame('rb', stream_get_meta_data($lock)['mode']);
-        } finally {
-            fclose($lock);
+        $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
+
+        if ($operation === 'gc') {
+            $this->collectGarbage($cache);
+
+            $this->assertFileDoesNotExist($file);
+        } else {
+            $result = $cache->set('key', 'new');
+
+            $this->assertTrue($result);
+            $this->assertSame('new', $cache->get('key'));
         }
     }
 
@@ -420,33 +474,66 @@ final class ReviewRegressionTest extends TestCase
         $this->assertTrue($cache->set('key', 'old'));
         $blocked = true;
         $this->assertFalse($cache->set('key', 'new'));
-        $this->setInaccessibleProperty($cache, 'useReadLock', true);
-        $this->assertSame('miss', $cache->get('key', 'miss'));
-        $this->assertFalse($cache->has('key'));
-        $this->assertFalse($this->invokeMethod($cache, 'isExpired', [
-            $this->invokeMethod($cache, 'getCacheFile', ['key']),
-        ]));
-        $this->assertFalse($this->invokeMethod($cache, 'hasCacheHeader', [
-            $this->invokeMethod($cache, 'getCacheFile', ['key']),
-        ]));
         $blocked = false;
         $this->assertSame('old', $cache->get('key'));
     }
 
-    #[RunInSeparateProcess]
-    public function testFailedReadLockClosesItsHandle(): void
+    public static function lockFailures(): array
     {
+        return [
+            ['get', 'open'], ['get', 'lock'],
+            ['has', 'open'], ['has', 'lock'],
+            ['gc', 'open'], ['gc', 'lock'],
+            ['clear', 'open'], ['clear', 'lock'],
+        ];
+    }
+
+    #[RunInSeparateProcess]
+    #[RequiresOperatingSystemFamily('Windows')]
+    #[DataProvider('lockFailures')]
+    public function testUnavailableLockPreservesEntry(string $operation, string $failure): void
+    {
+        $blocked = false;
         $stream = null;
-        $this->getFunctionMock('Yiisoft\Cache\File', 'flock')->expects($this->once())
-            ->willReturnCallback(static function ($handle, int $operation) use (&$stream): bool {
-                $stream = $handle;
-                return false;
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fopen')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, string $mode) use (&$blocked, $failure) {
+                return $blocked && $failure === 'open' && str_ends_with($path, '@gc.lock')
+                    ? false
+                    : fopen($path, $mode);
             });
-        mkdir(self::DIRECTORY, recursive: true);
-        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $this->assertFalse($this->invokeMethod($cache, 'lockForRead'));
-        $this->assertNotNull($stream);
-        $this->assertFalse(is_resource($stream));
+        $this->getFunctionMock('Yiisoft\Cache\File', 'flock')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function ($handle, int $operation) use (&$stream, &$blocked, $failure): bool {
+                if ($blocked && $failure === 'lock') {
+                    $stream = $handle;
+                    return false;
+                }
+                return flock($handle, $operation);
+            });
+        // Clearing a dot-key without a suffix must read its header to identify it as a cache entry.
+        $key = $operation === 'clear' ? '.key' : 'key';
+        $suffix = $operation === 'clear' ? '' : '.bin';
+        $cache = new FileCache(self::DIRECTORY, fileSuffix: $suffix, gcProbability: 0);
+        MockHelper::$time = time();
+        $cache->set($key, 'value', 1);
+        $file = $this->findCacheFile(self::DIRECTORY, $key . $suffix);
+        $blocked = true;
+
+        if ($operation === 'gc') {
+            MockHelper::$time += 2;
+            $this->collectGarbage($cache);
+        } elseif ($operation === 'clear') {
+            $cache->clear();
+        } else {
+            $result = $cache->$operation($key);
+
+            $this->assertSame($operation === 'get' ? null : false, $result);
+        }
+
+        $this->assertFileExists($file);
+        if ($failure === 'lock') {
+            $this->assertNotNull($stream);
+            $this->assertFalse(is_resource($stream));
+        }
     }
 
     public static function permissionFailures(): array
@@ -458,13 +545,14 @@ final class ReviewRegressionTest extends TestCase
     #[DataProvider('permissionFailures')]
     public function testPermissionFailurePreservesOldValue(string $failure): void
     {
-        $cache = new FileCache(self::DIRECTORY, fileMode: 0640, gcProbability: 0);
+        $cache = new FileCache(self::DIRECTORY, fileMode: 0640, directoryLevel: 0, gcProbability: 0);
+        mkdir(self::DIRECTORY, recursive: true);
         $this->getFunctionMock('Yiisoft\Cache\File', 'chmod')->expects($this->atLeastOnce())
             ->willReturnCallback(static function (string $path, int $mode) use ($failure): bool {
                 $suffix = $failure === 'lock' ? '@gc.lock' : '.tmp';
                 return str_ends_with($path, $suffix) ? false : chmod($path, $mode);
             });
-        $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
+        $file = self::DIRECTORY . '/key.bin';
         file_put_contents($file, serialize('old'));
         touch($file, time() + 3600);
         $this->assertFalse($cache->set('key', 'new'));
@@ -473,12 +561,9 @@ final class ReviewRegressionTest extends TestCase
 
     #[RunInSeparateProcess]
     #[DataProvider('concurrentReadOperations')]
-    public function testPublicationDuringRead(string $operation, bool $forceReadLock): void
+    public function testPublicationDuringRead(string $operation): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        if ($forceReadLock) {
-            $this->setInaccessibleProperty($cache, 'useReadLock', true);
-        }
         $old = str_repeat('old', 8192);
         MockHelper::$time = time();
         $this->assertTrue($cache->set('key', $old, $operation === 'gc' ? 1 : 3600));
@@ -497,7 +582,7 @@ final class ReviewRegressionTest extends TestCase
             throw new RuntimeException('Timed out waiting for ' . $file);
         };
         $this->getFunctionMock('Yiisoft\Cache\File', 'fgets')->expects($this->atLeastOnce())
-            ->willReturnCallback(function ($handle, int $length) use (&$armed, $waitFor, $forceReadLock): string|false {
+            ->willReturnCallback(function ($handle, int $length) use (&$armed, $waitFor): string|false {
                 $header = fgets($handle, $length);
                 if (!$armed) {
                     return $header;
@@ -505,7 +590,7 @@ final class ReviewRegressionTest extends TestCase
                 $armed = false;
                 touch(self::DIRECTORY . '/@start');
                 $waitFor(self::DIRECTORY . '/@prepared');
-                if ($forceReadLock || PHP_OS_FAMILY === 'Windows') {
+                if (PHP_OS_FAMILY === 'Windows') {
                     usleep(100000);
                     clearstatcache();
                     $this->assertFileDoesNotExist(self::DIRECTORY . '/@published');
@@ -517,7 +602,7 @@ final class ReviewRegressionTest extends TestCase
         try {
             // Start the worker before opening the reader, so it cannot inherit a held lock.
             $process = proc_open(
-                [PHP_BINARY, __DIR__ . '/publication_writer.php', self::DIRECTORY, $forceReadLock ? '1' : '0', 'wait'],
+                [PHP_BINARY, __DIR__ . '/publication_writer.php', self::DIRECTORY, 'wait'],
                 [1 => ['file', self::DIRECTORY . '/@output', 'w'], 2 => ['redirect', 1]],
                 $pipes,
             );
@@ -527,7 +612,7 @@ final class ReviewRegressionTest extends TestCase
             } elseif ($operation === 'has') {
                 $this->assertTrue($cache->has('key'));
             } else {
-                $this->invokeMethod($cache, 'removeCacheFiles', [self::DIRECTORY, true]);
+                $this->collectGarbage($cache);
             }
         } finally {
             if (is_resource($process)) {

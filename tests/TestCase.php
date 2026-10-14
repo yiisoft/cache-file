@@ -9,6 +9,12 @@ use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
 use stdClass;
+use FilesystemIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
+use Yiisoft\Cache\File\FileCache;
+use Yiisoft\Cache\File\MockHelper;
 
 use function array_diff;
 use function is_array;
@@ -17,6 +23,8 @@ use function is_object;
 use function rmdir;
 use function scandir;
 use function unlink;
+
+require_once __DIR__ . '/MockHelper.php';
 
 abstract class TestCase extends \PHPUnit\Framework\TestCase
 {
@@ -169,5 +177,30 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         }
 
         rmdir($directory);
+    }
+
+    protected function collectGarbage(FileCache $cache): void
+    {
+        $previous = MockHelper::$randomInt;
+        MockHelper::$randomInt = 0;
+        try {
+            // A non-positive TTL triggers GC without adding an entry to the fixture.
+            $cache->withGcProbability(1_000_000)->set('gc-trigger', null, 0);
+        } finally {
+            MockHelper::$randomInt = $previous;
+        }
+    }
+
+    protected function findCacheFile(string $directory, string $filename): string
+    {
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        );
+        foreach ($files as $file) {
+            if ($file->getFilename() === $filename) {
+                return $file->getPathname();
+            }
+        }
+        throw new RuntimeException("Cache fixture file '$filename' was not found.");
     }
 }

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Yiisoft\Cache\File;
 
-use ReflectionProperty;
-
 use function dirname;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
@@ -19,7 +17,7 @@ function flock($stream, int $operation): bool
     return $nativeFlock($stream, $operation);
 }
 
-if (($argv[3] ?? '') === 'wait') {
+if (($argv[2] ?? '') === 'wait') {
     $deadline = microtime(true) + 10;
     while (!is_file($argv[1] . '/@start')) {
         if (microtime(true) >= $deadline) {
@@ -31,10 +29,6 @@ if (($argv[3] ?? '') === 'wait') {
 }
 
 $cache = new FileCache($argv[1], gcProbability: 0);
-if (($argv[2] ?? '0') === '1') {
-    $property = new ReflectionProperty($cache, 'useReadLock');
-    $property->setValue($cache, true);
-}
 $success = $cache->set('key', str_repeat('new', 8192), 3600);
 file_put_contents($argv[1] . '/@published', $success ? '1' : '0');
 exit($success ? 0 : 1);
