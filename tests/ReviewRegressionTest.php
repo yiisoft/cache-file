@@ -303,7 +303,7 @@ final class ReviewRegressionTest extends TestCase
 
     public static function concurrentReadOperations(): array
     {
-        return [['get'], ['has'], ['gc']];
+        return [['get', false], ['has', false], ['gc', false], ['get', true], ['has', true], ['gc', true]];
     }
 
     #[RunInSeparateProcess]
@@ -338,16 +338,15 @@ final class ReviewRegressionTest extends TestCase
         $this->assertTrue($cache->set('key', 'old'));
         $blocked = true;
         $this->assertFalse($cache->set('key', 'new'));
-        if (PHP_OS_FAMILY === 'Windows') {
-            $this->assertSame('miss', $cache->get('key', 'miss'));
-            $this->assertFalse($cache->has('key'));
-            $this->assertFalse($this->invokeMethod($cache, 'isExpired', [
-                $this->invokeMethod($cache, 'getCacheFile', ['key']),
-            ]));
-            $this->assertFalse($this->invokeMethod($cache, 'hasCacheHeader', [
-                $this->invokeMethod($cache, 'getCacheFile', ['key']),
-            ]));
-        }
+        $this->setInaccessibleProperty($cache, 'useReadLock', true);
+        $this->assertSame('miss', $cache->get('key', 'miss'));
+        $this->assertFalse($cache->has('key'));
+        $this->assertFalse($this->invokeMethod($cache, 'isExpired', [
+            $this->invokeMethod($cache, 'getCacheFile', ['key']),
+        ]));
+        $this->assertFalse($this->invokeMethod($cache, 'hasCacheHeader', [
+            $this->invokeMethod($cache, 'getCacheFile', ['key']),
+        ]));
         $blocked = false;
         $this->assertSame('old', $cache->get('key'));
     }
@@ -368,11 +367,36 @@ final class ReviewRegressionTest extends TestCase
         $this->assertFalse(is_resource($stream));
     }
 
+    public static function permissionFailures(): array
+    {
+        return [['lock'], ['temporary']];
+    }
+
+    #[RunInSeparateProcess]
+    #[DataProvider('permissionFailures')]
+    public function testPermissionFailurePreservesOldValue(string $failure): void
+    {
+        $cache = new FileCache(self::DIRECTORY, fileMode: 0640, gcProbability: 0);
+        $this->getFunctionMock('Yiisoft\Cache\File', 'chmod')->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, int $mode) use ($failure): bool {
+                $suffix = $failure === 'lock' ? '@gc.lock' : '.tmp';
+                return str_ends_with($path, $suffix) ? false : chmod($path, $mode);
+            });
+        $file = $this->invokeMethod($cache, 'getCacheFile', ['key', true]);
+        file_put_contents($file, serialize('old'));
+        touch($file, time() + 3600);
+        $this->assertFalse($cache->set('key', 'new'));
+        $this->assertSame(serialize('old'), file_get_contents($file));
+    }
+
     #[RunInSeparateProcess]
     #[DataProvider('concurrentReadOperations')]
-    public function testPublicationDuringRead(string $operation): void
+    public function testPublicationDuringRead(string $operation, bool $forceReadLock): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
+        if ($forceReadLock) {
+            $this->setInaccessibleProperty($cache, 'useReadLock', true);
+        }
         $old = str_repeat('old', 8192);
         MockHelper::$time = time();
         $this->assertTrue($cache->set('key', $old, $operation === 'gc' ? 1 : 3600));
@@ -391,20 +415,15 @@ final class ReviewRegressionTest extends TestCase
             throw new RuntimeException('Timed out waiting for ' . $file);
         };
         $this->getFunctionMock('Yiisoft\Cache\File', 'fgets')->expects($this->atLeastOnce())
-            ->willReturnCallback(function ($handle, int $length) use (&$armed, &$process, $waitFor): string|false {
+            ->willReturnCallback(function ($handle, int $length) use (&$armed, $waitFor, $forceReadLock): string|false {
                 $header = fgets($handle, $length);
                 if (!$armed) {
                     return $header;
                 }
                 $armed = false;
-                $process = proc_open(
-                    [PHP_BINARY, __DIR__ . '/publication_writer.php', self::DIRECTORY],
-                    [1 => ['file', self::DIRECTORY . '/@output', 'w'], 2 => ['redirect', 1]],
-                    $pipes,
-                );
-                $this->assertIsResource($process);
+                touch(self::DIRECTORY . '/@start');
                 $waitFor(self::DIRECTORY . '/@prepared');
-                if (PHP_OS_FAMILY === 'Windows') {
+                if ($forceReadLock || PHP_OS_FAMILY === 'Windows') {
                     usleep(100000);
                     clearstatcache();
                     $this->assertFileDoesNotExist(self::DIRECTORY . '/@published');
@@ -414,6 +433,13 @@ final class ReviewRegressionTest extends TestCase
                 return $header;
             });
         try {
+            // Start the worker before opening the reader, so it cannot inherit a held lock.
+            $process = proc_open(
+                [PHP_BINARY, __DIR__ . '/publication_writer.php', self::DIRECTORY, $forceReadLock ? '1' : '0', 'wait'],
+                [1 => ['file', self::DIRECTORY . '/@output', 'w'], 2 => ['redirect', 1]],
+                $pipes,
+            );
+            $this->assertIsResource($process);
             if ($operation === 'get') {
                 $this->assertSame($old, $cache->get('key'));
             } elseif ($operation === 'has') {

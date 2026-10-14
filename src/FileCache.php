@@ -61,6 +61,8 @@ final class FileCache implements CacheInterface
     private const TEMPORARY_FILE_LIFETIME = 3600;
     private const GC_LOCK_FILE = '@gc.lock';
 
+    private bool $useReadLock = PHP_OS_FAMILY === 'Windows';
+
     /**
      * @param string $cachePath The directory to store cache files.
      * @param int $directoryMode The permission to be set for newly created directories. This value will be used
@@ -98,7 +100,7 @@ final class FileCache implements CacheInterface
 
         $handle = false;
         $lock = null;
-        if (PHP_OS_FAMILY === 'Windows' && ($lock = $this->lockForRead()) === false) {
+        if ($this->useReadLock && ($lock = $this->lockForRead()) === false) {
             return $default;
         }
         try {
@@ -165,7 +167,7 @@ final class FileCache implements CacheInterface
             try {
                 // Windows cannot replace a file while a reader has it open.
                 // Elsewhere, writers may publish concurrently, except during GC.
-                $published = flock($lock, PHP_OS_FAMILY === 'Windows' ? LOCK_EX : LOCK_SH)
+                $published = flock($lock, $this->useReadLock ? LOCK_EX : LOCK_SH)
                     && @rename($temporaryFile, $file);
             } finally {
                 fclose($lock);
@@ -506,7 +508,7 @@ final class FileCache implements CacheInterface
     {
         $handle = false;
         $lock = null;
-        if (PHP_OS_FAMILY === 'Windows' && !$locked && ($lock = $this->lockForRead()) === false) {
+        if ($this->useReadLock && !$locked && ($lock = $this->lockForRead()) === false) {
             return false;
         }
         try {
@@ -545,7 +547,7 @@ final class FileCache implements CacheInterface
     {
         $handle = false;
         $lock = null;
-        if (PHP_OS_FAMILY === 'Windows' && ($lock = $this->lockForRead()) === false) {
+        if ($this->useReadLock && ($lock = $this->lockForRead()) === false) {
             return false;
         }
         try {
@@ -624,7 +626,7 @@ final class FileCache implements CacheInterface
     {
         $handle = false;
         $lock = null;
-        if (PHP_OS_FAMILY === 'Windows' && ($lock = $this->lockForRead()) === false) {
+        if ($this->useReadLock && ($lock = $this->lockForRead()) === false) {
             return false;
         }
         try {
