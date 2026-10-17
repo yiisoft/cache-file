@@ -35,6 +35,8 @@ use function substr;
 use function unlink;
 use function unserialize;
 
+use function strlen;
+
 use const LOCK_EX;
 use const LOCK_SH;
 use const LOCK_UN;
@@ -123,13 +125,13 @@ final class FileCache implements CacheInterface
             @unlink($file);
         }
 
-        if (file_put_contents($file, serialize($value), LOCK_EX) === false) {
+        $data = serialize($value);
+        if (@file_put_contents($file, $data, LOCK_EX) !== strlen($data)) {
             return false;
         }
 
         if ($this->fileMode !== null) {
-            $result = @chmod($file, $this->fileMode);
-            if (!$this->isLastErrorSafe($result)) {
+            if (!@chmod($file, $this->fileMode)) {
                 return false;
             }
         }
@@ -141,7 +143,7 @@ final class FileCache implements CacheInterface
             $result = true;
         }
 
-        return $this->isLastErrorSafe($result);
+        return $result;
     }
 
     public function delete(string $key): bool
