@@ -23,18 +23,14 @@ use function dirname;
 use function fileperms;
 use function file_put_contents;
 use function function_exists;
-use function glob;
-use function is_dir;
 use function is_object;
 use function posix_geteuid;
-use function rmdir;
 use function sprintf;
 use function str_replace;
 use function substr;
 use function sys_get_temp_dir;
 use function time;
 use function uniqid;
-use function unlink;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -658,20 +654,5 @@ final class FileCacheTest extends TestCase
     private function normalizePath(string $path): string
     {
         return str_replace('\\', '/', $path);
-    }
-
-    private function removeDirectory(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            return;
-        }
-
-        if ($items = glob("{$directory}/*")) {
-            foreach ($items as $item) {
-                is_dir($item) ? $this->removeDirectory($item) : unlink($item);
-            }
-        }
-
-        rmdir($directory);
     }
 }

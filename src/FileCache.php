@@ -11,8 +11,8 @@ use Traversable;
 
 use function array_keys;
 use function array_map;
-use function closedir;
 use function error_get_last;
+use function file_exists;
 use function fileowner;
 use function fopen;
 use function function_exists;
@@ -24,13 +24,11 @@ use function opendir;
 use function posix_geteuid;
 use function readdir;
 use function restore_error_handler;
-use function rmdir;
 use function serialize;
 use function set_error_handler;
 use function sprintf;
 use function strpbrk;
 use function substr;
-use function unlink;
 use function unserialize;
 
 use function strlen;
@@ -149,13 +147,7 @@ final class FileCache implements CacheInterface
         $this->validateKey($key);
         $file = $this->getCacheFile($key);
 
-        if (!is_file($file)) {
-            return true;
-        }
-
-        $result = @unlink($file);
-
-        return $this->isLastErrorSafe($result);
+        return !is_file($file) || $this->removeFile($file);
     }
 
     public function clear(): bool
@@ -384,7 +376,7 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Recursively removing expired cache files under a directory. This method is mainly used by {@see gc()}.
+     * Recursively removes cache files but keeps directories that concurrent writers may still use.
      *
      * @param string $path The directory under which expired cache files are removed.
      * @param bool $expiredOnly Whether to only remove expired cache files.
@@ -396,35 +388,32 @@ final class FileCache implements CacheInterface
             return;
         }
 
-        while (($file = readdir($handle)) !== false) {
-            if (str_starts_with($file, '.')) {
-                continue;
-            }
-
-            $fullPath = $path . DIRECTORY_SEPARATOR . $file;
-
-            if (is_dir($fullPath)) {
-                $this->removeCacheFiles($fullPath, $expiredOnly);
-
-                if (!$expiredOnly && !@rmdir($fullPath)) {
-                    $errorMessage = error_get_last()['message'] ?? '';
-                    throw new CacheException("Unable to remove directory '{$fullPath}': {$errorMessage}");
+        try {
+            while (($file = readdir($handle)) !== false) {
+                if (str_starts_with($file, '.')) {
+                    continue;
                 }
-            } else {
+
+                $fullPath = $path . DIRECTORY_SEPARATOR . $file;
+
+                if (is_dir($fullPath)) {
+                    $this->removeCacheFiles($fullPath, $expiredOnly);
+                    continue;
+                }
                 if ($expiredOnly) {
                     $expiration = @filemtime($fullPath);
                     if ($expiration === false || $expiration >= time()) {
                         continue;
                     }
                 }
-                if (!@unlink($fullPath)) {
+                if (!$this->removeFile($fullPath)) {
                     $errorMessage = error_get_last()['message'] ?? '';
                     throw new CacheException("Unable to remove file '{$fullPath}': {$errorMessage}");
                 }
             }
+        } finally {
+            closedir($handle);
         }
-
-        closedir($handle);
     }
 
     /**
@@ -473,23 +462,25 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Check if error was because of file was already deleted by another process on high load.
+     * Removes the file. It isn't a failure if the file was already removed by another process.
      */
-    private function isLastErrorSafe(bool $result): bool
+    private function removeFile(string $file): bool
     {
-        if ($result !== false) {
-            return true;
-        }
-
-        $lastError = error_get_last();
-
-        if ($lastError === null) {
-            return true;
-        }
-
-        if (str_ends_with($lastError['message'] ?? '', 'No such file or directory')) {
+        // Another process can remove the file and then store a new one
+        // in its place right before the check, so try more than once.
+        for ($attempt = 0; $attempt < 3; $attempt++) {
             error_clear_last();
-            return true;
+
+            if (@unlink($file) || str_ends_with(error_get_last()['message'] ?? '', 'No such file or directory')) {
+                return true;
+            }
+
+            // The error isn't available when an error handler has handled it.
+            clearstatcache(true, $file);
+
+            if (!file_exists($file)) {
+                return true;
+            }
         }
 
         return false;
