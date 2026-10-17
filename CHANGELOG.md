@@ -6,6 +6,7 @@
 - Enh #97: Explicitly import classes and constants in "use" section (@mspirkov)
 - Chg #93: Deprecate `FileCache::with*()` methods in favor of constructor parameters (@samdark)
 - Enh #101: Remove unnecessary files from Composer package (@mspirkov)
+- Bug #111: Report failed and incomplete writes in `FileCache::set()` and suppress write warnings (@samdark)
 
 ## 3.2.0 January 13, 2025
 
