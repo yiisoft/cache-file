@@ -31,6 +31,7 @@
 /composer.json -export-ignore
 /README.md     -export-ignore
 /CHANGELOG.md  -export-ignore
+/UPGRADE.md    -export-ignore
 /LICENSE.md    -export-ignore
 
 # Avoid merge conflicts in CHANGELOG

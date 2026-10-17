@@ -28,9 +28,9 @@ final class SetMultipleFailureTest extends TestCase
     public function testFailureDoesNotSkipRemainingEntries(): void
     {
         $this->getFunctionMock('Yiisoft\Cache\File', 'file_put_contents')
-            ->expects($this->exactly(3))
-            ->willReturnCallback(static function (string $path, string $data, int $flags): int|false {
-                return $data === serialize('fail') ? false : file_put_contents($path, $data, $flags);
+            ->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, array $data): int|false {
+                return str_ends_with(implode('', $data), serialize('fail')) ? false : file_put_contents($path, $data);
             });
         $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
 

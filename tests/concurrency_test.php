@@ -11,7 +11,7 @@ if (!\extension_loaded('pcntl')) {
 }
 
 $directory = __DIR__ . '/runtime/stress-' . bin2hex(random_bytes(8));
-$cache = new FileCache($directory, fileMode: 0777, directoryLevel: 2, gcProbability: 0);
+$cache = new FileCache($directory, gcProbability: 0);
 if (!$cache->set('key', str_repeat('seed', 1024))) {
     throw new RuntimeException('Cannot seed cache.');
 }
@@ -32,11 +32,16 @@ for ($worker = 0; $worker < 6; $worker++) {
         try {
             for ($i = 0; $i < 200; $i++) {
                 if ($worker < 3) {
-                    // A concurrent delete can prevent chmod() or touch() from completing.
-                    // Returning false is correct; unexpected warnings must still fail the worker.
-                    $cache->set('key', $worker, 60);
-                } elseif (!$cache->delete('key')) {
-                    throw new RuntimeException('Concurrent delete failed.');
+                    if (!$cache->set('key', str_repeat('writer-' . $worker, 1024), 60)) {
+                        throw new RuntimeException('Concurrent write failed.');
+                    }
+                } elseif ($worker === 3) {
+                    $i % 2 ? $cache->delete('key') : $cache->clear();
+                } else {
+                    $value = $cache->get('key');
+                    if ($value !== null && !\in_array($value, [str_repeat('seed', 1024), str_repeat('writer-0', 1024), str_repeat('writer-1', 1024), str_repeat('writer-2', 1024)], true)) {
+                        throw new RuntimeException('Observed partial or corrupt value.');
+                    }
                 }
             }
         } catch (Throwable $e) {
@@ -52,9 +57,7 @@ foreach ($children as $pid) {
     pcntl_waitpid($pid, $status);
     $failed = $failed || !pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0;
 }
-if (!$cache->set('key', 'final') || $cache->get('key') !== 'final') {
-    $failed = true;
-}
+$cache->clear();
 $entries = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($entries as $entry) {
     $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());

@@ -6,6 +6,16 @@
 - Enh #97: Explicitly import classes and constants in "use" section (@mspirkov)
 - Chg #93: Deprecate `FileCache::with*()` methods in favor of constructor parameters (@samdark)
 - Enh #101: Remove unnecessary files from Composer package (@mspirkov)
+- Bug #110: Replace cache files atomically in `FileCache::set()` to prevent partial reads and gaps during replacement (@samdark)
+- Bug #110: Coordinate Windows reads with file replacement and reuse cache locks owned by other users (@samdark)
+- Chg #110: Store expiry inside cache files. Clear the cache on upgrade or rollback;
+  see [UPGRADE.md](UPGRADE.md) for deployment instructions (@samdark)
+- Bug #110: Coordinate file replacement with garbage collection to keep fresh values,
+  using writable handles for exclusive locks on NFS (@samdark)
+- Chg #110: Retain active temporary files and the internal lock file during garbage collection and
+  `FileCache::clear()` to coordinate with concurrent writers (@samdark)
+- Bug #110: Identify dot-prefixed entries in the new format with an empty file suffix during cleanup (@samdark)
+- Bug #110: Treat truncated entries in the new format as cache misses in `FileCache::get()` and `FileCache::has()` (@samdark)
 - Bug #111: Report failed and incomplete writes in `FileCache::set()` and suppress write warnings (@samdark)
 - Bug #112: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
 - Bug #113: Skip cache entries during garbage collection when their modification time cannot be read (@samdark)

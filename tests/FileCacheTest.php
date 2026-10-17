@@ -22,15 +22,13 @@ use function array_map;
 use function dirname;
 use function fileperms;
 use function file_put_contents;
-use function function_exists;
 use function is_object;
-use function posix_geteuid;
 use function sprintf;
+use function str_repeat;
 use function str_replace;
 use function substr;
 use function sys_get_temp_dir;
 use function time;
-use function uniqid;
 
 use const DIRECTORY_SEPARATOR;
 
@@ -284,38 +282,6 @@ final class FileCacheTest extends TestCase
         $this->assertNull($this->cache->get('expire_test'));
     }
 
-    /**
-     * We have to on separate process because of PHPMock not being able to mock a function that
-     * was already called.
-     *
-     * runInSeparateProcess
-     */
-    public function testCacheRenewalOnDifferentOwnership(): void
-    {
-        if (!function_exists('posix_geteuid')) {
-            $this->markTestSkipped('Can not test without posix extension installed.');
-        }
-
-        $cacheValue = uniqid('value_', false);
-        $cacheKey = uniqid('key_', false);
-
-        MockHelper::$time = time();
-        $this->assertTrue($this->cache->set($cacheKey, $cacheValue, 2));
-        $this->assertSame($cacheValue, $this->cache->get($cacheKey));
-
-        // Override fileowner method so it always returns something not equal to the current user
-        $notCurrentEuid = posix_geteuid() + 15;
-        $this
-            ->getFunctionMock('Yiisoft\Cache\File', 'fileowner')
-            ->expects($this->any())
-            ->willReturn($notCurrentEuid);
-
-        $this->assertTrue(
-            $this->cache->set($cacheKey, uniqid('value_2_', false), 2),
-            'Cannot rebuild cache on different file ownership',
-        );
-    }
-
     public function testSetWithDateIntervalTtl(): void
     {
         $this->cache->set('a', 1, new DateInterval('PT1H'));
@@ -455,6 +421,53 @@ final class FileCacheTest extends TestCase
         $this->assertFileDoesNotExist($cacheFile);
     }
 
+    public function testSetWithKeyOfMaximumFileNameLength(): void
+    {
+        if ($this->isWindows()) {
+            $this->markTestSkipped('Path length is limited on Windows.');
+        }
+
+        // 255 bytes is a common file name limit, 4 bytes are taken by the ".bin" suffix.
+        $key = str_repeat('a', 251);
+
+        $this->assertTrue($this->cache->set($key, 'value'));
+        $this->assertSame('value', $this->cache->get($key));
+    }
+
+    public static function temporaryFileCleanupOperations(): array
+    {
+        return [
+            'clear-recent' => [false, false],
+            'clear-stale' => [false, true],
+            'gc-recent' => [true, false],
+            'gc-stale' => [true, true],
+        ];
+    }
+
+    #[DataProvider('temporaryFileCleanupOperations')]
+    public function testCleanupRemovesOnlyStaleTemporaryFile(bool $expiredOnly, bool $stale): void
+    {
+        $directory = self::RUNTIME_DIRECTORY . '/cache';
+        $cache = new FileCache($directory, gcProbability: 0);
+        $cache->set('key', 'value');
+        $file = dirname($this->findCacheFile($directory, 'key.bin')) . '/@0123456789abcdef.tmp';
+        file_put_contents($file, 'data');
+        touch($file, time() - 10);
+        MockHelper::$time = time() + ($stale ? 3601 : 0);
+
+        if ($expiredOnly) {
+            $this->collectGarbage($cache);
+        } else {
+            $cache->clear();
+        }
+
+        if ($stale) {
+            $this->assertFileDoesNotExist($file);
+        } else {
+            $this->assertFileExists($file);
+        }
+    }
+
     public function testDeleteForCacheItemNotExist(): void
     {
         $this->assertNull($this->cache->get('key'));
@@ -533,7 +546,7 @@ final class FileCacheTest extends TestCase
         $cacheFile = $refMethodGetCacheFile->invoke($this->cache, __FUNCTION__);
 
         // simulate cache expire 10 seconds ago
-        touch($cacheFile, time() - 10);
+        file_put_contents($cacheFile, 'YFC1 ' . (time() - 10) . " 2\nN;");
         clearstatcache();
 
         $this->assertNull($this->cache->get(__FUNCTION__));

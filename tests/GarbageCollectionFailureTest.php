@@ -31,11 +31,13 @@ final class GarbageCollectionFailureTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    public function testGcKeepsEntryWhenModificationTimeCannotBeRead(): void
+    public function testGcKeepsLegacyEntryWhenMetadataCannotBeRead(): void
     {
         $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
         $cache->set('key', 'live', 3600);
-        $this->getFunctionMock('Yiisoft\Cache\File', 'filemtime')
+        file_put_contents(self::DIRECTORY . '/key.bin', serialize('legacy'));
+        touch(self::DIRECTORY . '/key.bin', time() + 3600);
+        $this->getFunctionMock('Yiisoft\Cache\File', 'fstat')
             ->expects($this->once())
             ->willReturn(false);
         MockHelper::$randomInt = 0;
@@ -49,6 +51,7 @@ final class GarbageCollectionFailureTest extends TestCase
     {
         $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
         $cache->set('expired', 'old');
+        file_put_contents(self::DIRECTORY . '/expired.bin', serialize('legacy'));
         touch(self::DIRECTORY . '/expired.bin', time() - 1);
         $cache->set('live', 'fresh', 3600);
         MockHelper::$randomInt = 0;

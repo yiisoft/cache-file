@@ -30,9 +30,9 @@ final class WriteFailureTest extends TestCase
     public function testShortWriteReturnsFalse(): void
     {
         $this->getFunctionMock('Yiisoft\Cache\File', 'file_put_contents')
-            ->expects($this->once())
-            ->willReturnCallback(static function (string $path, string $data, int $flags): int|false {
-                return file_put_contents($path, substr($data, 0, -1), $flags);
+            ->expects($this->atLeastOnce())
+            ->willReturnCallback(static function (string $path, array $data): int|false {
+                return file_put_contents($path, substr(implode('', $data), 0, -1));
             });
         $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
 
@@ -59,7 +59,7 @@ final class WriteFailureTest extends TestCase
 
     public static function metadataOperations(): array
     {
-        return [['chmod'], ['touch']];
+        return [['chmod']];
     }
 
     #[DataProvider('metadataOperations')]

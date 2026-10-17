@@ -1,0 +1,22 @@
+{
+    "runner.bootstrap": "vendor/autoload.php",
+    "runner.path": "benchmarks",
+    "runner.php_config": {
+        "opcache.enable_cli": "0"
+    },
+    "storage.xml_storage_path": ".phpbench",
+    "report.generators": {
+        "cache": {
+            "cols": [
+                "benchmark",
+                "subject",
+                "set",
+                "its",
+                "mean",
+                "mode",
+                "rstdev"
+            ],
+            "generator": "expression"
+        }
+    }
+}
