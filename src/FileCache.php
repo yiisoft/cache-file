@@ -382,7 +382,7 @@ final class FileCache implements CacheInterface
      * @param bool $expiredOnly Whether to only remove expired cache files.
      * If false, all files under `$path` will be removed.
      */
-    private function removeCacheFiles(string $path, bool $expiredOnly): void
+    private function removeCacheFiles(string $path, bool $expiredOnly, int $depth = 0): void
     {
         if (($handle = @opendir($path)) === false) {
             return;
@@ -390,14 +390,21 @@ final class FileCache implements CacheInterface
 
         try {
             while (($file = readdir($handle)) !== false) {
-                if (str_starts_with($file, '.')) {
+                if ($file === '.' || $file === '..') {
                     continue;
                 }
 
                 $fullPath = $path . DIRECTORY_SEPARATOR . $file;
 
                 if (is_dir($fullPath)) {
-                    $this->removeCacheFiles($fullPath, $expiredOnly);
+                    // Hidden directories can only be cache shards at the configured depth.
+                    if ($file[0] !== '.' || (strlen($file) === 2 && $depth < $this->directoryLevel)) {
+                        $this->removeCacheFiles($fullPath, $expiredOnly, $depth + 1);
+                    }
+                    continue;
+                }
+                if (str_starts_with($file, '.') && !$this->hasFileSuffix($file)) {
+                    // Preserve unrelated hidden files, for example, ".gitignore".
                     continue;
                 }
                 if ($expiredOnly) {
@@ -414,6 +421,11 @@ final class FileCache implements CacheInterface
         } finally {
             closedir($handle);
         }
+    }
+
+    private function hasFileSuffix(string $file): bool
+    {
+        return $this->fileSuffix !== '' && str_ends_with($file, $this->fileSuffix);
     }
 
     /**
