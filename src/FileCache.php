@@ -13,7 +13,6 @@ use function array_keys;
 use function array_map;
 use function closedir;
 use function error_get_last;
-use function filemtime;
 use function fileowner;
 use function fopen;
 use function function_exists;
@@ -23,7 +22,6 @@ use function iterator_to_array;
 use function mkdir;
 use function opendir;
 use function posix_geteuid;
-use function random_int;
 use function readdir;
 use function restore_error_handler;
 use function rmdir;
@@ -412,9 +410,17 @@ final class FileCache implements CacheInterface
                     $errorMessage = error_get_last()['message'] ?? '';
                     throw new CacheException("Unable to remove directory '{$fullPath}': {$errorMessage}");
                 }
-            } elseif ((!$expiredOnly || @filemtime($fullPath) < time()) && !@unlink($fullPath)) {
-                $errorMessage = error_get_last()['message'] ?? '';
-                throw new CacheException("Unable to remove file '{$fullPath}': {$errorMessage}");
+            } else {
+                if ($expiredOnly) {
+                    $expiration = @filemtime($fullPath);
+                    if ($expiration === false || $expiration >= time()) {
+                        continue;
+                    }
+                }
+                if (!@unlink($fullPath)) {
+                    $errorMessage = error_get_last()['message'] ?? '';
+                    throw new CacheException("Unable to remove file '{$fullPath}': {$errorMessage}");
+                }
             }
         }
 
