@@ -30,7 +30,6 @@ use function set_error_handler;
 use function sprintf;
 use function strpbrk;
 use function substr;
-use function unlink;
 use function unserialize;
 
 use function strlen;
