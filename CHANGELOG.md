@@ -8,6 +8,7 @@
 - Enh #101: Remove unnecessary files from Composer package (@mspirkov)
 - Bug #111: Report failed and incomplete writes in `FileCache::set()` and suppress write warnings (@samdark)
 - Bug #112: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
+- Bug #113: Skip cache entries during garbage collection when their modification time cannot be read (@samdark)
 
 ## 3.2.0 January 13, 2025
 
