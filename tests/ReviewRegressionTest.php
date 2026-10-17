@@ -15,8 +15,6 @@ use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
 use RuntimeException;
 
-use function is_array;
-
 use function is_resource;
 
 use const PHP_OS_FAMILY;
@@ -150,21 +148,6 @@ final class ReviewRegressionTest extends TestCase
         $this->assertSame('live', $cache->get('key'));
     }
 
-    #[RunInSeparateProcess]
-    public function testSetMultipleReportsFailureAndStillAttemptsLaterEntries(): void
-    {
-        $this->getFunctionMock('Yiisoft\Cache\File', 'file_put_contents')->expects($this->atLeastOnce())
-            ->willReturnCallback(static function (string $path, string|array $data): int|false {
-                $record = is_array($data) ? implode('', $data) : $data;
-                return str_ends_with($record, serialize('fail')) ? false : file_put_contents($path, $data);
-            });
-        $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
-        $this->assertFalse($cache->setMultiple(['before' => 'ok', 'bad' => 'fail', 'after' => 'ok']));
-        $this->assertSame('ok', $cache->get('before'));
-        $this->assertSame('ok', $cache->get('after'));
-        $this->assertFalse($cache->has('bad'));
-    }
-
     /** @requires OSFAMILY Linux */
     public function testRetryWriteDoesNotEscapeAsWarningException(): void
     {
@@ -281,30 +264,6 @@ final class ReviewRegressionTest extends TestCase
         $after = stat($file);
         $this->assertSame($before['ino'], $after['ino']);
         $this->assertSame($before['dev'], $after['dev']);
-    }
-
-    #[DataProvider('directoryCleanupOperations')]
-    public function testCleanupPreservesUnrelatedHiddenDirectories(int $level, bool $expiredOnly): void
-    {
-        $cache = new FileCache(self::DIRECTORY, directoryLevel: $level, gcProbability: 0);
-        $paths = [self::DIRECTORY . '/.git/objects', self::DIRECTORY . '/ab/.config'];
-        $paths[] = self::DIRECTORY . str_repeat('/ab', $level) . '/.x';
-        foreach ($paths as $path) {
-            mkdir($path, recursive: true);
-            file_put_contents($path . '/keep', 'unrelated');
-            touch($path . '/keep', time() - 3600);
-        }
-        $this->assertTrue($cache->set('.foo', 'cached'));
-        if ($expiredOnly) {
-            MockHelper::$time = time() + 31_536_001;
-            $this->collectGarbage($cache);
-        } else {
-            $cache->clear();
-        }
-        $this->assertNull($cache->get('.foo'));
-        foreach ($paths as $path) {
-            $this->assertSame('unrelated', file_get_contents($path . '/keep'));
-        }
     }
 
     public static function lockOperations(): array

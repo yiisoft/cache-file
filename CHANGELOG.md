@@ -10,17 +10,17 @@
 - Bug #110: Coordinate Windows reads with file replacement and reuse cache locks owned by other users (@samdark)
 - Chg #110: Store expiry inside cache files. Clear the cache on upgrade or rollback;
   see [UPGRADE.md](UPGRADE.md) for deployment instructions (@samdark)
-- Bug #110: Handle incomplete writes and file replacement failures in `FileCache::set()`, and suppress write warnings (@samdark)
-- Bug #110: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
-- Bug #110: Coordinate file replacement with garbage collection to keep fresh values and skip unreadable entries,
+- Bug #110: Coordinate file replacement with garbage collection to keep fresh values,
   using writable handles for exclusive locks on NFS (@samdark)
-- Bug #110: Avoid exceptions during garbage collection and `FileCache::clear()` when another process has already
-  removed a file (@samdark)
-- Chg #110: Retain directories, active temporary files and the internal lock file during garbage collection and
-  `FileCache::clear()` to avoid races with concurrent writers (@samdark)
-- Bug #110: Remove cache entries with dot-prefixed keys during garbage collection and `FileCache::clear()`, including
-  entries in the new format with an empty file suffix, while preserving unrelated hidden directories (@samdark)
+- Chg #110: Retain active temporary files and the internal lock file during garbage collection and
+  `FileCache::clear()` to coordinate with concurrent writers (@samdark)
+- Bug #110: Identify dot-prefixed entries in the new format with an empty file suffix during cleanup (@samdark)
 - Bug #110: Treat truncated entries in the new format as cache misses in `FileCache::get()` and `FileCache::has()` (@samdark)
+- Bug #111: Report failed and incomplete writes in `FileCache::set()` and suppress write warnings (@samdark)
+- Bug #112: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
+- Bug #113: Skip cache entries during garbage collection when their modification time cannot be read (@samdark)
+- Bug #114: Tolerate concurrent file removal during cleanup and keep directories used by writers (@samdark)
+- Bug #115: Clean up dot-prefixed cache keys with a non-empty file suffix while preserving unrelated hidden files and directories (@samdark)
 
 ## 3.2.0 January 13, 2025
 

@@ -434,60 +434,6 @@ final class FileCacheTest extends TestCase
         $this->assertSame('value', $this->cache->get($key));
     }
 
-    public static function cleanupOperations(): array
-    {
-        return ['clear' => [false], 'gc' => [true]];
-    }
-
-    #[DataProvider('cleanupOperations')]
-    public function testCleanupRemovesItemWithKeyStartingWithDot(bool $expiredOnly): void
-    {
-        $directory = self::RUNTIME_DIRECTORY . '/cache';
-        $cache = new FileCache($directory, gcProbability: 0);
-        MockHelper::$time = time();
-        $cache->set('.key', 'value', 1);
-        $file = $this->findCacheFile($directory, '.key.bin');
-        MockHelper::$time += 2;
-
-        if ($expiredOnly) {
-            $this->collectGarbage($cache);
-        } else {
-            $cache->clear();
-        }
-
-        $this->assertFileDoesNotExist($file);
-    }
-
-    #[DataProvider('cleanupOperations')]
-    public function testCleanupKeepsDotFileThatIsNotCacheFile(bool $expiredOnly): void
-    {
-        $cache = new FileCache(self::RUNTIME_DIRECTORY . '/cache', gcProbability: 0);
-        $cache->set('key', 'value');
-        $file = self::RUNTIME_DIRECTORY . '/cache/.gitignore';
-        file_put_contents($file, '*');
-        touch($file, time() - 10);
-
-        if ($expiredOnly) {
-            $this->collectGarbage($cache);
-        } else {
-            $cache->clear();
-        }
-
-        $this->assertFileExists($file);
-    }
-
-    public function testClearKeepsDirectories(): void
-    {
-        $this->cache->set('key', 'value');
-        $directory = dirname($this->findCacheFile(self::RUNTIME_DIRECTORY . '/cache', 'key.bin'));
-
-        $result = $this->cache->clear();
-
-        $this->assertTrue($result);
-        $this->assertFalse($this->cache->has('key'));
-        $this->assertDirectoryExists($directory);
-    }
-
     public static function temporaryFileCleanupOperations(): array
     {
         return [

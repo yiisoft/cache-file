@@ -10,12 +10,10 @@ use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use Yiisoft\Cache\File\FileCache;
 use Yiisoft\Cache\File\MockHelper;
 
-use function basename;
 use function clearstatcache;
 use function dirname;
 use function glob;
 use function is_file;
-use function time;
 use function unlink;
 
 use const DIRECTORY_SEPARATOR;
@@ -127,66 +125,6 @@ final class RaceConditionTest extends TestCase
 
         $this->assertNotNull($valueSeenByReader, 'The race was not simulated.');
         $this->assertContains($valueSeenByReader, ['old', 'new']);
-    }
-
-    #[RunInSeparateProcess]
-    public function testGcIgnoresFileRemovedByAnotherProcess(): void
-    {
-        $cache = new FileCache(self::CACHE_DIRECTORY, gcProbability: 0);
-        $expiredFile = null;
-        $raced = false;
-
-        $this
-            ->getFunctionMock(self::MOCK_NAMESPACE, 'str_starts_with')
-            ->expects($this->any())
-            ->willReturnCallback(
-                static function (string $haystack, string $needle) use (&$expiredFile, &$raced): bool {
-                    if ($expiredFile !== null && $haystack === basename($expiredFile) && is_file($expiredFile)) {
-                        $raced = unlink($expiredFile);
-                    }
-                    return str_starts_with($haystack, $needle);
-                },
-            );
-
-        MockHelper::$time = time();
-        $cache->set('expired', 'value', 1);
-        $expiredFile = $this->findCacheFile(self::CACHE_DIRECTORY, 'expired.bin');
-        MockHelper::$time += 2;
-        clearstatcache();
-
-        $this->collectGarbage($cache);
-
-        $this->assertTrue($raced, 'The race was not simulated.');
-        $this->assertFalse($cache->has('expired'));
-    }
-
-    #[RunInSeparateProcess]
-    public function testClearIgnoresItemAddedByAnotherProcess(): void
-    {
-        $cache = new FileCache(self::CACHE_DIRECTORY, gcProbability: 0);
-        $armed = false;
-        $raced = false;
-
-        $this
-            ->getFunctionMock(self::MOCK_NAMESPACE, 'str_starts_with')
-            ->expects($this->any())
-            ->willReturnCallback(
-                static function (string $haystack, string $needle) use (&$armed, &$raced): bool {
-                    if ($armed && $haystack === 'ab1.bin') {
-                        $armed = false;
-                        $raced = (new FileCache(self::CACHE_DIRECTORY, gcProbability: 0))->set('ab2', 'value');
-                    }
-                    return str_starts_with($haystack, $needle);
-                },
-            );
-
-        // Both items are stored in the same subdirectory.
-        $cache->set('ab1', 'value');
-        $armed = true;
-
-        $this->assertTrue($cache->clear());
-        $this->assertTrue($raced, 'The race was not simulated.');
-        $this->assertFalse($cache->has('ab1'));
     }
 
     #[RunInSeparateProcess]

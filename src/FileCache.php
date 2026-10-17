@@ -12,7 +12,6 @@ use Traversable;
 use function array_keys;
 use function array_map;
 use function bin2hex;
-use function closedir;
 use function dirname;
 use function error_get_last;
 use function file_exists;
@@ -576,31 +575,6 @@ final class FileCache implements CacheInterface
     }
 
     /**
-     * Removes the file. It isn't a failure if the file was already removed by another process.
-     */
-    private function removeFile(string $file): bool
-    {
-        // Another process can remove the file and then store a new one
-        // in its place right before the check, so try more than once.
-        for ($attempt = 0; $attempt < 3; $attempt++) {
-            error_clear_last();
-
-            if (@unlink($file) || str_ends_with(error_get_last()['message'] ?? '', 'No such file or directory')) {
-                return true;
-            }
-
-            // The error isn't available when an error handler has handled it.
-            clearstatcache(true, $file);
-
-            if (!file_exists($file)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Removes expired cache files.
      */
     private function gc(): void
@@ -707,5 +681,30 @@ final class FileCache implements CacheInterface
     private function iterableToArray(iterable $iterable): array
     {
         return $iterable instanceof Traversable ? iterator_to_array($iterable) : $iterable;
+    }
+
+    /**
+     * Removes the file. It isn't a failure if the file was already removed by another process.
+     */
+    private function removeFile(string $file): bool
+    {
+        // Another process can remove the file and then store a new one
+        // in its place right before the check, so try more than once.
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            error_clear_last();
+
+            if (@unlink($file) || str_ends_with(error_get_last()['message'] ?? '', 'No such file or directory')) {
+                return true;
+            }
+
+            // The error isn't available when an error handler has handled it.
+            clearstatcache(true, $file);
+
+            if (!file_exists($file)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

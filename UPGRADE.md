@@ -6,8 +6,7 @@ New cache files store the expiry time with the serialized value. Older versions 
 modification time. The new version can read old files, but older versions cannot read the new format.
 Old and new versions must use separate cache directories if they run at the same time.
 
-Public method signatures and constructor defaults are unchanged. `setMultiple()` now returns `false`
-if any write fails and still attempts the remaining writes.
+Public method signatures and constructor defaults are unchanged.
 
 The package configuration still uses `@runtime/cache` by default. To reuse this directory, clear its cached
 contents while all processes that use it are stopped.

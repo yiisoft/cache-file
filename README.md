@@ -150,6 +150,9 @@ $cache->delete($key);
 $cache->clear();
 ```
 
+Garbage collection and `clear()` keep cache directories because other processes may still write to them.
+Remove these directories only after all processes using the cache have stopped.
+
 To work with values in a more efficient manner, batch operations should be used:
 
 - `getMultiple()`
