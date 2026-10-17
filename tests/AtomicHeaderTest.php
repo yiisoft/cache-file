@@ -165,14 +165,23 @@ final class AtomicHeaderTest extends TestCase
         $this->assertSame('replacement with a different length', $cache->get('key'));
     }
 
-    public function testMalformedHeaderIsAMiss(): void
+    #[DataProvider('malformedHeaders')]
+    public function testMalformedHeaderIsAMiss(string $header): void
     {
         $cache = new FileCache(self::DIRECTORY, gcProbability: 0);
         $cache->set('key', 'fixture');
         $file = $this->findCacheFile(self::DIRECTORY, 'key.bin');
-        file_put_contents($file, 'YFC1 invalid header');
+        file_put_contents($file, $header);
         $this->assertSame('miss', $cache->get('key', 'miss'));
         $this->assertFalse($cache->has('key'));
+    }
+
+    public static function malformedHeaders(): array
+    {
+        return [
+            'invalid syntax' => ['YFC1 invalid header'],
+            'empty payload' => ["YFC1 4102444800 0\n"],
+        ];
     }
 
     public function testDirectoryAtCachePathIsAMiss(): void
