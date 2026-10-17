@@ -7,6 +7,7 @@
 - Chg #93: Deprecate `FileCache::with*()` methods in favor of constructor parameters (@samdark)
 - Enh #101: Remove unnecessary files from Composer package (@mspirkov)
 - Bug #111: Report failed and incomplete writes in `FileCache::set()` and suppress write warnings (@samdark)
+- Bug #112: Return `false` from `FileCache::setMultiple()` when any write fails, while still attempting remaining entries (@samdark)
 
 ## 3.2.0 January 13, 2025
 

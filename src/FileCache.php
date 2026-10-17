@@ -184,11 +184,12 @@ final class FileCache implements CacheInterface
         $values = $this->iterableToArray($values);
         $this->validateKeys(array_map(\strval(...), array_keys($values)));
 
+        $success = true;
         foreach ($values as $key => $value) {
-            $this->set((string) $key, $value, $ttl);
+            $success = $this->set((string) $key, $value, $ttl) && $success;
         }
 
-        return true;
+        return $success;
     }
 
     public function deleteMultiple(iterable $keys): bool
