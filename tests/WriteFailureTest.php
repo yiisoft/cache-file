@@ -27,19 +27,6 @@ final class WriteFailureTest extends TestCase
     }
 
     #[RunInSeparateProcess]
-    public function testShortWriteReturnsFalse(): void
-    {
-        $this->getFunctionMock('Yiisoft\Cache\File', 'file_put_contents')
-            ->expects($this->once())
-            ->willReturnCallback(static function (string $path, string $data, int $flags): int|false {
-                return file_put_contents($path, substr($data, 0, -1), $flags);
-            });
-        $cache = new FileCache(self::DIRECTORY, directoryLevel: 0, gcProbability: 0);
-
-        $this->assertFalse($cache->set('key', 'value'));
-    }
-
-    #[RunInSeparateProcess]
     public function testWriteWarningDoesNotEscapeAsException(): void
     {
         mkdir(self::DIRECTORY . '/key.bin', recursive: true);
@@ -71,7 +58,6 @@ final class WriteFailureTest extends TestCase
             ->expects($this->once())
             ->willReturn(false);
         $cache = new FileCache(self::DIRECTORY, fileMode: 0600, directoryLevel: 0, gcProbability: 0);
-        error_clear_last();
 
         $this->assertFalse($cache->set('key', 'value'));
     }

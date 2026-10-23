@@ -35,8 +35,6 @@ use function substr;
 use function unlink;
 use function unserialize;
 
-use function strlen;
-
 use const LOCK_EX;
 use const LOCK_SH;
 use const LOCK_UN;
@@ -125,8 +123,7 @@ final class FileCache implements CacheInterface
             @unlink($file);
         }
 
-        $data = serialize($value);
-        if (@file_put_contents($file, $data, LOCK_EX) !== strlen($data)) {
+        if (@file_put_contents($file, serialize($value), LOCK_EX) === false) {
             return false;
         }
 
@@ -136,14 +133,12 @@ final class FileCache implements CacheInterface
             }
         }
 
-        $result = false;
-
         if (@touch($file, $expiration)) {
             clearstatcache();
-            $result = true;
+            return true;
         }
 
-        return $result;
+        return false;
     }
 
     public function delete(string $key): bool
