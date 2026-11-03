@@ -123,25 +123,22 @@ final class FileCache implements CacheInterface
             @unlink($file);
         }
 
-        if (file_put_contents($file, serialize($value), LOCK_EX) === false) {
+        if (@file_put_contents($file, serialize($value), LOCK_EX) === false) {
             return false;
         }
 
         if ($this->fileMode !== null) {
-            $result = @chmod($file, $this->fileMode);
-            if (!$this->isLastErrorSafe($result)) {
+            if (!@chmod($file, $this->fileMode)) {
                 return false;
             }
         }
 
-        $result = false;
-
         if (@touch($file, $expiration)) {
             clearstatcache();
-            $result = true;
+            return true;
         }
 
-        return $this->isLastErrorSafe($result);
+        return false;
     }
 
     public function delete(string $key): bool
